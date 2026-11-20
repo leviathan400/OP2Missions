@@ -8,6 +8,7 @@ In [OP2Lua](https://github.com/leviathan400/OP2Lua) so far:
 
 - **`multiplayer/`:** the 59 stock multiplayer missions: 25 Last One Standing, 8 Space Race, 7 Resource Race, 6 Midas
   and 13 Land Rush.
+- **`campaign/`:** the 24 campaign missions, Eden and Plymouth 1 to 12 (`e01` to `e12`, `p01` to `p12`).
 - **`colony/`:** the 5 colony games (`CEP1`, `CES1`, `CPP1`, `CPS1`, `CPS2`).
 - **`tutorials/`:** the 14 tutorials (`t01` to `t14`).
 - **`demos/`:** the 3 auto demos (`ademo1` to `ademo3`), the games the menu plays by itself.
@@ -30,6 +31,13 @@ random seeds. `op2dll lua` then wrote the mission again from what it did:
 for 10,000 ticks. Every unit's owner, type, weapon, position and hit points and the game's random numbers matched on
 every tick, for all 59. They haven't been played through by people yet: what players set off is converted but not
 tested this way. Reports are welcome as issues.
+
+**Campaign missions:** each converted at Easy, Normal and Hard, with the start, the objectives, the timers and
+disasters, scripted events and reinforcements, and the computer player's base, AI groups and waves. All 24 matched their
+originals in OP2TestHarness at all three difficulties (seed 1, nobody playing, up to 40,000 ticks): 72 runs, every
+unit's owner, type, weapon, position and hit points and the game's random numbers on every tick. That tests what a
+mission does on its own; some chains the player sets off (research finished, a structure built, Plymouth 12's RLV taken)
+are still empty functions, listed at the end of each `.lua`. A mission's carry-over from the one before isn't converted.
 
 **Colony games:** each setup was run at Easy, Normal and Hard over many seeds. What every difficulty makes alike is in
 the placement file; the rest (extra units, colonists, stores, research, kits, morale) and the beacons the setup rolls
@@ -60,10 +68,11 @@ You need Outpost 2 with [OPU](https://www.outpost2.net/) 1.4.1 and the OP2Lua ru
 3. The mission lists in the game's multiplayer lobby with "(Lua)" after the original's name. Every player in a network
    game needs the same files.
 
-For the colony games, tutorials and auto demos, copy a folder from `colony/`, or the files from `tutorials/` or
-`demos/`, into a folder under `OPU\maps\` the same way. Each is named as the original with "(Lua)" after it. The colony
-games list under Colony Games, as their DLL names start with `c`. Whether the game's Tutorial menu lists them, or its
-menu plays the Lua demos, isn't checked yet: they were tested by starting each one directly.
+For the campaign missions, colony games, tutorials and auto demos, copy a folder from `colony/`, or the files from
+`campaign/`, `tutorials/` or `demos/`, into a folder under `OPU\maps\` the same way. Each is named as the original with
+"(Lua)" after it. The colony games list under Colony Games, as their DLL names start with `c`. Whether the game's
+campaign menu plays the Lua campaign missions, its Tutorial menu lists the tutorials, or its menu plays the Lua demos,
+isn't checked yet: they were tested by starting each one directly.
 
 The maps themselves (`.map`), tilesets and art come from your own install; nothing of the game is in this repository.
 
@@ -132,6 +141,35 @@ The maps themselves (`.map`), tilesets and art come from your own install; nothi
 | `mf6_12` | Root Canal | 6 | Space Race | [`RootCanal`](multiplayer/RootCanal/) |
 
 `Players` is the most the mission takes. Folders follow `OPU/base/maps`; Flood Plain (`mu4_31`) is in `FloodPlain/`.
+
+## Campaign missions
+
+| DLL | Mission |
+|---|---|
+| `e01` | Eden Mission #1 |
+| `e02` | Eden Mission #2 |
+| `e03` | Eden Mission #3 |
+| `e04` | Eden Mission #4 |
+| `e05` | Eden Mission #5 |
+| `e06` | Eden Mission #6 |
+| `e07` | Eden Mission #7 |
+| `e08` | Eden Mission #8 |
+| `e09` | Eden Mission #9 |
+| `e10` | Eden Mission #10 |
+| `e11` | Eden Mission #11 |
+| `e12` | Eden Mission #12 |
+| `p01` | Plymouth Mission #1 |
+| `p02` | Plymouth Mission #2 |
+| `p03` | Plymouth Mission #3 |
+| `p04` | Plymouth Mission #4 |
+| `p05` | Plymouth Mission #5 |
+| `p06` | Plymouth Mission #6 |
+| `p07` | Plymouth Mission #7 |
+| `p08` | Plymouth Mission #8 |
+| `p09` | Plymouth Mission #9 |
+| `p10` | Plymouth Mission #10 |
+| `p11` | Plymouth Mission #11 |
+| `p12` | Plymouth Mission #12 |
 
 ## Colony games
 
