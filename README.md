@@ -9,6 +9,7 @@ In [OP2Lua](https://github.com/leviathan400/OP2Lua) so far:
 - **`multiplayer/`:** the 59 stock multiplayer missions: 25 Last One Standing, 8 Space Race, 7 Resource Race, 6 Midas
   and 13 Land Rush.
 - **`tutorials/`:** the 14 tutorials (`t01` to `t14`).
+- **`demos/`:** the 3 auto demos (`ademo1` to `ademo3`), the games the menu plays by itself.
 
 ## How they were made
 
@@ -33,6 +34,10 @@ tested this way. Reports are welcome as issues.
 the objectives (the guidance comes from the game itself), so each is converted whole. All 14 matched their originals
 in OP2TestHarness on every tick and in every screenshot.
 
+**Auto demos:** converted like the colony games, their start and their end, with their computer players' AI groups
+and trigger functions finished by hand. All three matched their originals in OP2TestHarness on every tick and in every
+screenshot.
+
 ## Installing
 
 You need Outpost 2 with [OPU](https://www.outpost2.net/) 1.4.1 and the OP2Lua runtime:
@@ -45,9 +50,9 @@ You need Outpost 2 with [OPU](https://www.outpost2.net/) 1.4.1 and the OP2Lua ru
 3. The mission lists in the game's multiplayer lobby with "(Lua)" after the original's name. Every player in a network
    game needs the same files.
 
-For the tutorials, copy the files from `tutorials/` into a folder under `OPU\maps\` the same way. Each is named as the
-original with "(Lua)" after it. Whether the game's Tutorial menu lists them isn't checked yet: they were tested by
-starting each one directly.
+For the tutorials and the auto demos, copy the files from `tutorials/` or `demos/` into a folder under `OPU\maps\` the
+same way. Each is named as the original with "(Lua)" after it. Whether the game's Tutorial menu lists them, or its
+menu plays the Lua demos, isn't checked yet: they were tested by starting each one directly.
 
 The maps themselves (`.map`), tilesets and art come from your own install; nothing of the game is in this repository.
 
@@ -135,6 +140,14 @@ The maps themselves (`.map`), tilesets and art come from your own install; nothi
 | `t12` | 12 - Spaceport |
 | `t13` | P - Plymouth Unit Reference |
 | `t14` | E - Eden Unit Reference |
+
+## Auto demos
+
+| DLL | Demo |
+|---|---|
+| `ademo1` | AutoDemo Mission #1 |
+| `ademo2` | AutoDemo Mission #2 |
+| `ademo3` | AutoDemo Mission #3 |
 
 ## Related
 
