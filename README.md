@@ -4,8 +4,11 @@ Outpost 2 missions as readable source, mostly the game's stock missions re-creat
 without source; these are written from what each mission does when it runs, so they can be read, changed and learned
 from.
 
-This first set is the **59 stock multiplayer missions** in [OP2Lua](https://github.com/leviathan400/OP2Lua): 25 Last
-One Standing, 8 Space Race, 7 Resource Race, 6 Midas and 13 Land Rush.
+In [OP2Lua](https://github.com/leviathan400/OP2Lua) so far:
+
+- **`multiplayer/`:** the 59 stock multiplayer missions: 25 Last One Standing, 8 Space Race, 7 Resource Race, 6 Midas
+  and 13 Land Rush.
+- **`tutorials/`:** the 14 tutorials (`t01` to `t14`).
 
 ## How they were made
 
@@ -26,6 +29,10 @@ for 10,000 ticks. Every unit's owner, type, weapon, position and hit points and 
 every tick, for all 59. They haven't been played through by people yet: what players set off is converted but not
 tested this way. Reports are welcome as issues.
 
+**Tutorials:** their setups are the same at every difficulty and roll nothing, and the DLLs make only the start and
+the objectives (the guidance comes from the game itself), so each is converted whole. All 14 matched their originals
+in OP2TestHarness on every tick and in every screenshot.
+
 ## Installing
 
 You need Outpost 2 with [OPU](https://www.outpost2.net/) 1.4.1 and the OP2Lua runtime:
@@ -38,9 +45,13 @@ You need Outpost 2 with [OPU](https://www.outpost2.net/) 1.4.1 and the OP2Lua ru
 3. The mission lists in the game's multiplayer lobby with "(Lua)" after the original's name. Every player in a network
    game needs the same files.
 
+For the tutorials, copy the files from `tutorials/` into a folder under `OPU\maps\` the same way. Each is named as the
+original with "(Lua)" after it. Whether the game's Tutorial menu lists them isn't checked yet: they were tested by
+starting each one directly.
+
 The maps themselves (`.map`), tilesets and art come from your own install; nothing of the game is in this repository.
 
-## Missions
+## Multiplayer missions
 
 | DLL | Map | Players | Type | Folder |
 |---|---|---|---|---|
@@ -105,6 +116,25 @@ The maps themselves (`.map`), tilesets and art come from your own install; nothi
 | `mf6_12` | Root Canal | 6 | Space Race | [`RootCanal`](multiplayer/RootCanal/) |
 
 `Players` is the most the mission takes. Folders follow `OPU/base/maps`; Flood Plain (`mu4_31`) is in `FloodPlain/`.
+
+## Tutorials
+
+| DLL | Tutorial |
+|---|---|
+| `t01` | 1 - Navigating the Map |
+| `t02` | 2 - Basic Vehicle Commands |
+| `t03` | 3 - Reports and Information |
+| `t04` | 4 - Combat Vehicles and Structures |
+| `t05` | 5 - Advanced Vehicle Commands |
+| `t06` | 6 - Docking |
+| `t07` | 7 - Mining Vehicles and Structures |
+| `t08` | 8 - Research and Scientists |
+| `t09` | 9 - Construction |
+| `t10` | 10 - Morale |
+| `t11` | 11 - Colony Control |
+| `t12` | 12 - Spaceport |
+| `t13` | P - Plymouth Unit Reference |
+| `t14` | E - Eden Unit Reference |
 
 ## Related
 
