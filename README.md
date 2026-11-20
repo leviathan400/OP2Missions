@@ -1,2 +1,115 @@
 # OP2Missions
-Collection of Outpost 2 missions - Mostly stock missions re-created.
+
+Outpost 2 missions as readable source, mostly the game's stock missions re-created. The original mission DLLs shipped
+without source; these are written from what each mission does when it runs, so they can be read, changed and learned
+from.
+
+This first set is the **59 stock multiplayer missions** in [OP2Lua](https://github.com/leviathan400/OP2Lua): 25 Last
+One Standing, 8 Space Race, 7 Resource Race, 6 Midas and 13 Land Rush.
+
+## How they were made
+
+Each mission DLL was run in [OP2MissionReader](https://github.com/leviathan400/OP2MissionReader), which runs a
+mission's setup in [op2-rs](https://gitlab.com/bufke/op2-rs)'s mission host (an x86 emulator with the game's API)
+over every player count, colony, resource level, vehicle setting, day and night, morale and disaster choice, and many
+random seeds. `op2dll lua` then wrote the mission again from what it did:
+
+- `on_init` makes the original's draws of the game's random numbers in the same order, and from them and the lobby
+  the same units, beacons, walls and settings in the same order. So a game started with these is the original's game.
+- The win, the disasters and other timed events, lava, and the two stock computer players (Peacekeeper and La Corrida)
+  are converted. Fractures' setup is written by hand from the original's rules.
+- Each `.lua` ends with a list of anything that wasn't converted.
+
+**Checked against the originals:** each mission was run side by side with its original DLL in
+[OP2TestHarness](https://github.com/leviathan400/OP2TestHarness) (the real game, OPU 1.4.1, seed 1, nobody playing)
+for 10,000 ticks. Every unit's owner, type, weapon, position and hit points and the game's random numbers matched on
+every tick, for all 59. They haven't been played through by people yet: what players set off is converted but not
+tested this way. Reports are welcome as issues.
+
+## Installing
+
+You need Outpost 2 with [OPU](https://www.outpost2.net/) 1.4.1 and the OP2Lua runtime:
+
+1. Copy `OP2LuaCore.dll` from [OP2LuaSDK](https://github.com/leviathan400/OP2LuaSDK)'s `bin` into your Outpost 2
+   `OPU` folder (the SDK's `INSTALL.md` has the exact path).
+2. Copy a map's folder from `multiplayer/` into `OPU\maps\` (for example `OPU\maps\AlliedSiege\`). Each mission is
+   three files: `<dll>Lua.dll` (OP2Lua's stub, which the game loads), `<dll>Lua.lua` (the mission) and
+   `<dll>Lua.placement.lua`.
+3. The mission lists in the game's multiplayer lobby with "(Lua)" after the original's name. Every player in a network
+   game needs the same files.
+
+The maps themselves (`.map`), tilesets and art come from your own install; nothing of the game is in this repository.
+
+## Missions
+
+| DLL | Map | Players | Type | Folder |
+|---|---|---|---|---|
+| `mu2_02` | Great Divide | 2 | Land Rush | [`GreatDivide`](multiplayer/GreatDivide/) |
+| `mu2_10` | Beach Party | 2 | Land Rush | [`BeachParty`](multiplayer/BeachParty/) |
+| `mu3_08` | Three's a Crowd | 3 | Land Rush | [`ThreesACrowd`](multiplayer/ThreesACrowd/) |
+| `mu4_03` | Rock Garden | 4 | Land Rush | [`RockGarden`](multiplayer/RockGarden/) |
+| `mu4_04` | Barren Land | 4 | Land Rush | [`BarrenLand`](multiplayer/BarrenLand/) |
+| `mu4_07` | Four Mesas | 4 | Land Rush | [`FourMesas`](multiplayer/FourMesas/) |
+| `mu4_08` | The Rift | 4 | Land Rush | [`TheRift`](multiplayer/TheRift/) |
+| `mu4_13` | Unsettled Earth | 4 | Land Rush | [`UnsettledEarth`](multiplayer/UnsettledEarth/) |
+| `mu4_31` | Flood Plain | 4 | Land Rush | [`FloodPlain`](multiplayer/FloodPlain/) |
+| `mu6_01` | Axen's Home | 6 | Land Rush | [`AxensHome`](multiplayer/AxensHome/) |
+| `mu6_02` | Around the World | 6 | Land Rush | [`AroundTheWorld`](multiplayer/AroundTheWorld/) |
+| `mu6_12` | Root Canal | 6 | Land Rush | [`RootCanal`](multiplayer/RootCanal/) |
+| `mu6_41` | Fractures | 6 | Land Rush | [`Fractures`](multiplayer/Fractures/) |
+| `ml2_01` | Close Encounter | 2 | Last One Standing | [`CloseEncounter`](multiplayer/CloseEncounter/) |
+| `ml2_02` | Great Divide | 2 | Last One Standing | [`GreatDivide`](multiplayer/GreatDivide/) |
+| `ml2_03` | River of Fire | 2 | Last One Standing | [`RiverOfFire`](multiplayer/RiverOfFire/) |
+| `ml2_05` | Wishbone | 2 | Last One Standing | [`Wishbone`](multiplayer/Wishbone/) |
+| `ml2_08` | Ambush Alley | 2 | Last One Standing | [`AmbushAlley`](multiplayer/AmbushAlley/) |
+| `ml2_10` | Beach Party | 2 | Last One Standing | [`BeachParty`](multiplayer/BeachParty/) |
+| `ml2_11` | Labyrinth | 2 | Last One Standing | [`Labyrinth`](multiplayer/Labyrinth/) |
+| `ml2_21` | Peacekeeper | 2 | Last One Standing | [`Peacekeeper`](multiplayer/Peacekeeper/) |
+| `ml2_31` | Tug-O-War | 2 | Last One Standing | [`TugOWar`](multiplayer/TugOWar/) |
+| `ml3_08` | Three's a Crowd | 3 | Last One Standing | [`ThreesACrowd`](multiplayer/ThreesACrowd/) |
+| `ml4_01` | Coliseum | 4 | Last One Standing | [`Coliseum`](multiplayer/Coliseum/) |
+| `ml4_05` | Crash Zone | 4 | Last One Standing | [`CrashZone`](multiplayer/CrashZone/) |
+| `ml4_07` | Four Mesas | 4 | Last One Standing | [`FourMesas`](multiplayer/FourMesas/) |
+| `ml4_08` | The Rift | 4 | Last One Standing | [`TheRift`](multiplayer/TheRift/) |
+| `ml4_10` | Double Cross | 4 | Last One Standing | [`DoubleCross`](multiplayer/DoubleCross/) |
+| `ml4_12` | Olympus Mons | 4 | Last One Standing | [`OlympusMons`](multiplayer/OlympusMons/) |
+| `ml4_13` | Unsettled Earth | 4 | Last One Standing | [`UnsettledEarth`](multiplayer/UnsettledEarth/) |
+| `ml4_21` | La Corrida | 4 | Last One Standing | [`LaCorrida`](multiplayer/LaCorrida/) |
+| `ml4_41` | Handprint | 4 | Last One Standing | [`Handprint`](multiplayer/Handprint/) |
+| `ml6_01` | Axen's Home | 6 | Last One Standing | [`AxensHome`](multiplayer/AxensHome/) |
+| `ml6_02` | Around the World | 6 | Last One Standing | [`AroundTheWorld`](multiplayer/AroundTheWorld/) |
+| `ml6_03` | Allied Siege | 6 | Last One Standing | [`AlliedSiege`](multiplayer/AlliedSiege/) |
+| `ml6_12` | Root Canal | 6 | Last One Standing | [`RootCanal`](multiplayer/RootCanal/) |
+| `ml6_21` | Pie Chart | 6 | Last One Standing | [`PieChart`](multiplayer/PieChart/) |
+| `ml6_31` | Earlobe | 6 | Last One Standing | [`Earlobe`](multiplayer/Earlobe/) |
+| `mm2_07` | Twin Valleys | 2 | Midas | [`TwinValleys`](multiplayer/TwinValleys/) |
+| `mm3_08` | Three's a Crowd | 3 | Midas | [`ThreesACrowd`](multiplayer/ThreesACrowd/) |
+| `mm4_01` | Coliseum | 4 | Midas | [`Coliseum`](multiplayer/Coliseum/) |
+| `mm4_04` | Barren Land | 4 | Midas | [`BarrenLand`](multiplayer/BarrenLand/) |
+| `mm4_08` | The Rift | 4 | Midas | [`TheRift`](multiplayer/TheRift/) |
+| `mm4_11` | Hidden Treasure | 4 | Midas | [`HiddenTreasure`](multiplayer/HiddenTreasure/) |
+| `mr2_10` | Beach Party | 2 | Resource Race | [`BeachParty`](multiplayer/BeachParty/) |
+| `mr3_08` | Three's a Crowd | 3 | Resource Race | [`ThreesACrowd`](multiplayer/ThreesACrowd/) |
+| `mr4_03` | Rock Garden | 4 | Resource Race | [`RockGarden`](multiplayer/RockGarden/) |
+| `mr4_05` | Crash Zone | 4 | Resource Race | [`CrashZone`](multiplayer/CrashZone/) |
+| `mr4_10` | Double Cross | 4 | Resource Race | [`DoubleCross`](multiplayer/DoubleCross/) |
+| `mr4_12` | Olympus Mons | 4 | Resource Race | [`OlympusMons`](multiplayer/OlympusMons/) |
+| `mr6_01` | Axen's Home | 6 | Resource Race | [`AxensHome`](multiplayer/AxensHome/) |
+| `mf2_01` | Close Encounter | 2 | Space Race | [`CloseEncounter`](multiplayer/CloseEncounter/) |
+| `mf3_02` | Biohazard | 3 | Space Race | [`Biohazard`](multiplayer/Biohazard/) |
+| `mf3_08` | Three's a Crowd | 3 | Space Race | [`ThreesACrowd`](multiplayer/ThreesACrowd/) |
+| `mf4_03` | Rock Garden | 4 | Space Race | [`RockGarden`](multiplayer/RockGarden/) |
+| `mf4_05` | Crash Zone | 4 | Space Race | [`CrashZone`](multiplayer/CrashZone/) |
+| `mf4_08` | The Rift | 4 | Space Race | [`TheRift`](multiplayer/TheRift/) |
+| `mf6_02` | Around the World | 6 | Space Race | [`AroundTheWorld`](multiplayer/AroundTheWorld/) |
+| `mf6_12` | Root Canal | 6 | Space Race | [`RootCanal`](multiplayer/RootCanal/) |
+
+`Players` is the most the mission takes. Folders follow `OPU/base/maps`; Flood Plain (`mu4_31`) is in `FloodPlain/`.
+
+## Related
+
+- [OP2Lua](https://github.com/leviathan400/OP2Lua) and [OP2LuaSDK](https://github.com/leviathan400/OP2LuaSDK): the
+  Lua mission runtime and its SDK.
+- [OP2MissionReader](https://github.com/leviathan400/OP2MissionReader): opens mission DLLs and converts them.
+- [OP2TestHarness](https://github.com/leviathan400/OP2TestHarness): runs missions in the game and records what they do.
+- [op2-rs](https://gitlab.com/bufke/op2-rs): the Outpost 2 reimplementation whose mission host runs the DLLs.
