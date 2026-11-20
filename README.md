@@ -8,6 +8,7 @@ In [OP2Lua](https://github.com/leviathan400/OP2Lua) so far:
 
 - **`multiplayer/`:** the 59 stock multiplayer missions: 25 Last One Standing, 8 Space Race, 7 Resource Race, 6 Midas
   and 13 Land Rush.
+- **`colony/`:** the 5 colony games (`CEP1`, `CES1`, `CPP1`, `CPS1`, `CPS2`).
 - **`tutorials/`:** the 14 tutorials (`t01` to `t14`).
 - **`demos/`:** the 3 auto demos (`ademo1` to `ademo3`), the games the menu plays by itself.
 
@@ -30,6 +31,15 @@ for 10,000 ticks. Every unit's owner, type, weapon, position and hit points and 
 every tick, for all 59. They haven't been played through by people yet: what players set off is converted but not
 tested this way. Reports are welcome as issues.
 
+**Colony games:** each setup was run at Easy, Normal and Hard over many seeds. What every difficulty makes alike is in
+the placement file; the rest (extra units, colonists, stores, research, kits, morale) and the beacons the setup rolls
+are in the `.lua` by difficulty. The win (600 colonists, or the starship's cargo), the failure checks, the disasters and
+lava, and the computer players' bases, AI groups and attack waves are converted, some of the computer players' functions
+written by hand from the original's rules. All five matched their originals in OP2TestHarness (Normal, nobody playing)
+on every tick until the colony fails. A few functions the original reaches only later in a game are still empty and
+listed in each `.lua`: Eden Population's research waves, Eden Starship's rare ore checks and one base expansion, and
+Plymouth Starship II's attacks.
+
 **Tutorials:** their setups are the same at every difficulty and roll nothing, and the DLLs make only the start and
 the objectives (the guidance comes from the game itself), so each is converted whole. All 14 matched their originals
 in OP2TestHarness on every tick and in every screenshot.
@@ -50,8 +60,9 @@ You need Outpost 2 with [OPU](https://www.outpost2.net/) 1.4.1 and the OP2Lua ru
 3. The mission lists in the game's multiplayer lobby with "(Lua)" after the original's name. Every player in a network
    game needs the same files.
 
-For the tutorials and the auto demos, copy the files from `tutorials/` or `demos/` into a folder under `OPU\maps\` the
-same way. Each is named as the original with "(Lua)" after it. Whether the game's Tutorial menu lists them, or its
+For the colony games, tutorials and auto demos, copy a folder from `colony/`, or the files from `tutorials/` or
+`demos/`, into a folder under `OPU\maps\` the same way. Each is named as the original with "(Lua)" after it. The colony
+games list under Colony Games, as their DLL names start with `c`. Whether the game's Tutorial menu lists them, or its
 menu plays the Lua demos, isn't checked yet: they were tested by starting each one directly.
 
 The maps themselves (`.map`), tilesets and art come from your own install; nothing of the game is in this repository.
@@ -121,6 +132,16 @@ The maps themselves (`.map`), tilesets and art come from your own install; nothi
 | `mf6_12` | Root Canal | 6 | Space Race | [`RootCanal`](multiplayer/RootCanal/) |
 
 `Players` is the most the mission takes. Folders follow `OPU/base/maps`; Flood Plain (`mu4_31`) is in `FloodPlain/`.
+
+## Colony games
+
+| DLL | Colony game | Folder |
+|---|---|---|
+| `CEP1` | Colony Builder - Eden, Population | [`ColonyEdenPopulation`](colony/ColonyEdenPopulation/) |
+| `CES1` | Colony Builder - Eden, Starship | [`ColonyEdenStarship`](colony/ColonyEdenStarship/) |
+| `CPP1` | Colony Builder - Plymouth, Population | [`ColonyPlymouthPopulation`](colony/ColonyPlymouthPopulation/) |
+| `CPS1` | Colony Builder - Plymouth, Starship | [`ColonyPlymouthStarship`](colony/ColonyPlymouthStarship/) |
+| `CPS2` | Colony Builder II - Plymouth, Starship | [`ColonyPlymouthStarship2`](colony/ColonyPlymouthStarship2/) |
 
 ## Tutorials
 

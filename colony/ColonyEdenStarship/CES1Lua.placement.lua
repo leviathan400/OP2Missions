@@ -1,0 +1,77 @@
+-- CES1Lua.placement.lua  -  Colony Builder - Eden, Starship (Lua)
+-- Converted by op2dll from CES1.dll: what its setup makes at every difficulty. What changes with the
+-- difficulty (more units on Easy, colonists, stores, research) and the beacons it rolls are in CES1Lua.lua.
+-- Coordinates are the in-game status-bar ones (map file tile + 1).
+return {
+  name = "Colony Builder - Eden, Starship (Lua)", map = "cm03.map", tech = "MULTITEK.TXT",
+  type = "Colony", max_tech = 12, players_count = 2,
+
+  players = {
+    [1] = { colony = "Eden", human = true, color = "Blue" },
+    [2] = { colony = "Plymouth", human = false, color = "Red" },
+  },
+
+  units = {
+  },
+
+  walls = {
+    { type = "Tube", at = { 16, 204 } },
+    { type = "Tube", at = { 16, 205 } },
+    { type = "Tube", at = { 16, 206 } },
+    { type = "Tube", at = { 16, 207 } },
+    { type = "Tube", at = { 16, 208 } },
+    { type = "Tube", at = { 16, 209 } },
+    { type = "Tube", at = { 16, 210 } },
+    { type = "Tube", at = { 16, 211 } },
+    { type = "Tube", at = { 16, 212 } },
+    { type = "Tube", at = { 19, 201 } },
+    { type = "Tube", at = { 20, 201 } },
+    { type = "Tube", at = { 21, 201 } },
+    { type = "Tube", at = { 22, 201 } },
+    { type = "Tube", at = { 22, 213 } },
+    { type = "Tube", at = { 23, 201 } },
+    { type = "Tube", at = { 23, 213 } },
+    { type = "Tube", at = { 24, 213 } },
+    { type = "Tube", at = { 25, 213 } },
+    { type = "Tube", at = { 26, 213 } },
+    { type = "Tube", at = { 27, 203 } },
+    { type = "Tube", at = { 27, 204 } },
+    { type = "Tube", at = { 27, 205 } },
+    { type = "Tube", at = { 27, 206 } },
+    { type = "Tube", at = { 27, 207 } },
+    { type = "Tube", at = { 27, 208 } },
+    { type = "Tube", at = { 27, 209 } },
+    { type = "Tube", at = { 27, 210 } },
+    { type = "Tube", at = { 27, 213 } },
+    { type = "Tube", at = { 28, 213 } },
+    { type = "Tube", at = { 29, 213 } },
+    { type = "Tube", at = { 168, 157 } },
+    { type = "Tube", at = { 168, 161 } },
+    { type = "Tube", at = { 169, 157 } },
+    { type = "Tube", at = { 169, 161 } },
+    { type = "Tube", at = { 170, 157 } },
+    { type = "Tube", at = { 170, 161 } },
+    { type = "Tube", at = { 171, 157 } },
+    { type = "Tube", at = { 171, 161 } },
+    { type = "Tube", at = { 173, 150 } },
+    { type = "Tube", at = { 173, 151 } },
+    { type = "Tube", at = { 173, 154 } },
+    { type = "Tube", at = { 173, 155 } },
+    { type = "Tube", at = { 173, 156 } },
+    { type = "Tube", at = { 173, 159 } },
+    { type = "Tube", at = { 173, 160 } },
+    { type = "Tube", at = { 176, 153 } },
+    { type = "Tube", at = { 176, 157 } },
+    { type = "Tube", at = { 176, 158 } },
+    { type = "Tube", at = { 177, 152 } },
+    { type = "Tube", at = { 177, 153 } },
+    { type = "Tube", at = { 177, 158 } },
+    { type = "Tube", at = { 180, 154 } },
+    { type = "Tube", at = { 180, 155 } },
+    { type = "Tube", at = { 180, 158 } },
+    { type = "Tube", at = { 180, 159 } },
+  },
+
+  beacons = {
+  },
+}
