@@ -620,7 +620,8 @@ function TruckArrive(t)
   convoy_came = true
 end
 
--- A unit reaches 15,2 - 15,6 (0x11002230): the escort leaves by 1,47 - 2,52; except on Easy, more escorts come in 5 to
+-- A unit of player 1 reaches 15,2 - 15,6 (0x11002230; p06.dll passes player 32, which the game reads modulo 32 as
+-- player 0): the escort leaves by 1,47 - 2,52; except on Easy, more escorts come in 5 to
 -- 10 marks (MoreConvoys).
 function TruckExitFunction(t)
   convoy_escort:do_exit_map()
@@ -709,7 +710,7 @@ function on_init()
     game.create_marker({ 122, 39 })
   end
   trigger.count{type = "CargoTruck", cargo = 9, compare = ">=", count = 1, player = 1, one_shot = true, on = TruckArrive}
-  trigger.rect{at = { x = 46, y = 1, raw = true }, width = 1, height = 5, player = 33, one_shot = true, on = TruckExitFunction}
+  trigger.rect{at = { x = 46, y = 1, raw = true }, width = 1, height = 5, player = 1, one_shot = true, on = TruckExitFunction}
   toggle1 = trigger.time{min = 1100, max = 1400, one_shot = false, on = Toggle1Active}  -- after 11 to 14 marks
   toggle2 = trigger.time{min = 1200, max = 1500, one_shot = false, enabled = false, on = Toggle2Active}  -- after 12 to 15 marks
   toggle3 = trigger.time{min = 1000, max = 1300, one_shot = false, enabled = false, on = Toggle3Active}  -- after 10 to 13 marks
