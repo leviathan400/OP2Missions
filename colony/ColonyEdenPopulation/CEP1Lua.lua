@@ -1,5 +1,5 @@
 -- CEP1Lua.lua  -  Colony Builder - Eden, Population (Lua)
--- Trigger functions finished by hand (CheckForFail, Lava, ScoutArrive, ScoutLeave, ReleaseMorale), from the disassembly of CEP1.dll.
+-- Trigger functions finished by hand (CheckForFail, Lava, ScoutArrive, ScoutLeave, ReleaseMorale, ResStarflare, ResRailGun, ResEMP, ResAcid, ResThor, ResearchedWeapons, ResearchedMed, ResearchedBig, FirstAttack, SecondAttack, WaitForMore, NextWave, Reinforce, ChangeTarget, MedWave, MedWave2, BigWave, BigWave2, BigWave3, Annoyance), from the disassembly of CEP1.dll.
 -- Converted by op2dll from CEP1.dll. With CEP1Lua.placement.lua (what every difficulty makes alike),
 -- this makes the colony's start: what changes with the difficulty, and the beacons the setup rolls.
 -- Games run: Easy 1124, Normal 1066, Hard 1066.
@@ -781,21 +781,364 @@ function roll_beacons(rolled)
   end
 end
 
--- Not converted (the list at the end says why); their triggers are made as the original makes them.
-function BigWave3(t) end
-function ResAcid(t) end
-function ResEMP(t) end
-function ResRailGun(t) end
-function ResStarflare(t) end
-function ResThor(t) end
-function ResearchedBig(t) end
-function ResearchedMed(t) end
-function ResearchedWeapons(t) end
-
 
 -- The scouts' group (0x1100CBE4) and which of Lava's three eruptions have come (0x1100CBEC).
 local scout_group
 local lava_used = { false, false, false }
+-- CEP1's wave unit tables by difficulty, as the DLL ships them (op2dll disasm --block --shipped at each address),
+-- for tools/finish_colony.py. G1 FirstAttack, G2 SecondAttack, GN1-GN3 NextWave, GN4 Reinforce, M1-M2 MedWave, M3
+-- MedWave2 (Easy and Normal share one), B1-B4 BigWave; a difficulty a wave doesn't make has no table.
+local WAVE_UNITS = {
+  G1 = {
+    Easy = {
+      { type = "Lynx", at = { 1, 137 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 1, 139 }, weapon = "Microwave" },
+    },  -- 0x1100C1E0
+    Normal = {
+      { type = "Lynx", at = { 1, 137 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 1, 139 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 1, 141 }, weapon = "Microwave" },
+    },  -- 0x1100CB30
+    Hard = {
+      { type = "Lynx", at = { 1, 135 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 1, 137 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 1, 139 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 1, 141 }, weapon = "Microwave" },
+    },  -- 0x1100C7C8
+  },
+  G2 = {
+    Easy = {
+      { type = "Lynx", at = { 1, 137 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 1, 139 }, weapon = "EMP" },
+    },  -- 0x1100C960
+    Normal = {
+      { type = "Lynx", at = { 1, 137 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 1, 139 }, weapon = "EMP" },
+      { type = "Lynx", at = { 1, 141 }, weapon = "Microwave" },
+    },  -- 0x1100CC18
+    Hard = {
+      { type = "Lynx", at = { 1, 135 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 1, 137 }, weapon = "EMP" },
+      { type = "Lynx", at = { 1, 139 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 1, 141 }, weapon = "Microwave" },
+    },  -- 0x1100CA70
+  },
+  GN1 = {
+    Easy = {
+      { type = "Lynx", at = { 221, 2 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 225, 2 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 227, 2 }, weapon = "EMP" },
+      { type = "Lynx", at = { 225, 3 }, weapon = "Microwave" },
+      { type = "Panther", at = { 224, 3 }, weapon = "RPG" },
+    },  -- 0x1100CCA0
+    Normal = {
+      { type = "Lynx", at = { 221, 2 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 223, 2 }, weapon = "EMP" },
+      { type = "Lynx", at = { 227, 2 }, weapon = "EMP" },
+      { type = "Lynx", at = { 225, 3 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 229, 3 }, weapon = "Microwave" },
+      { type = "Panther", at = { 224, 3 }, weapon = "RPG" },
+    },  -- 0x1100C158
+    Hard = {
+      { type = "Lynx", at = { 221, 2 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 223, 2 }, weapon = "EMP" },
+      { type = "Lynx", at = { 225, 2 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 227, 2 }, weapon = "EMP" },
+      { type = "Lynx", at = { 225, 3 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 227, 3 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 229, 3 }, weapon = "Microwave" },
+      { type = "Panther", at = { 222, 3 }, weapon = "RPG" },
+      { type = "Panther", at = { 224, 3 }, weapon = "RPG" },
+    },  -- 0x1100BFC0
+  },
+  GN2 = {
+    Easy = {
+      { type = "Panther", at = { 22, 256 }, weapon = "EMP" },
+      { type = "Panther", at = { 23, 256 }, weapon = "RPG" },
+      { type = "Panther", at = { 24, 256 }, weapon = "RPG" },
+    },  -- 0x1100C0D0
+    Normal = {
+      { type = "Panther", at = { 22, 256 }, weapon = "EMP" },
+      { type = "Panther", at = { 23, 256 }, weapon = "RPG" },
+      { type = "Panther", at = { 24, 256 }, weapon = "RPG" },
+      { type = "Panther", at = { 25, 256 }, weapon = "RPG" },
+    },  -- 0x1100C268
+    Hard = {
+      { type = "Panther", at = { 22, 256 }, weapon = "EMP" },
+      { type = "Panther", at = { 23, 256 }, weapon = "RPG" },
+      { type = "Panther", at = { 24, 256 }, weapon = "RPG" },
+      { type = "Panther", at = { 25, 256 }, weapon = "RPG" },
+      { type = "Panther", at = { 26, 256 }, weapon = "RPG" },
+    },  -- 0x1100C740
+  },
+  GN3 = {
+    Easy = {
+      { type = "Lynx", at = { 129, 256 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 131, 256 }, weapon = "EMP" },
+      { type = "Lynx", at = { 133, 256 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 135, 256 }, weapon = "RPG" },
+      { type = "Panther", at = { 130, 255 }, weapon = "RPG" },
+      { type = "Panther", at = { 132, 255 }, weapon = "EMP" },
+    },  -- 0x1100C850
+    Normal = {
+      { type = "Lynx", at = { 129, 256 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 131, 256 }, weapon = "EMP" },
+      { type = "Lynx", at = { 133, 256 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 135, 256 }, weapon = "RPG" },
+      { type = "Panther", at = { 130, 255 }, weapon = "RPG" },
+      { type = "Panther", at = { 132, 255 }, weapon = "EMP" },
+      { type = "Panther", at = { 134, 255 }, weapon = "RPG" },
+    },  -- 0x1100C6B8
+    Hard = {
+      { type = "Lynx", at = { 129, 256 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 131, 256 }, weapon = "EMP" },
+      { type = "Lynx", at = { 133, 256 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 135, 256 }, weapon = "EMP" },
+      { type = "Lynx", at = { 137, 256 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 139, 256 }, weapon = "RPG" },
+      { type = "Panther", at = { 130, 255 }, weapon = "RPG" },
+      { type = "Panther", at = { 132, 255 }, weapon = "RPG" },
+      { type = "Panther", at = { 134, 255 }, weapon = "EMP" },
+      { type = "Panther", at = { 136, 255 }, weapon = "RPG" },
+    },  -- 0x1100C9E8
+  },
+  GN4 = {
+    Easy = {
+      { type = "Lynx", at = { 19, 256 }, weapon = "EMP" },
+      { type = "Lynx", at = { 21, 256 }, weapon = "Microwave" },
+      { type = "Panther", at = { 23, 256 }, weapon = "RPG" },
+      { type = "Lynx", at = { 25, 256 }, weapon = "Microwave" },
+      { type = "Panther", at = { 27, 256 }, weapon = "RPG" },
+    },  -- 0x1100C8D8
+    Normal = {
+      { type = "Lynx", at = { 19, 256 }, weapon = "EMP" },
+      { type = "Lynx", at = { 21, 256 }, weapon = "Microwave" },
+      { type = "Panther", at = { 23, 256 }, weapon = "RPG" },
+      { type = "Lynx", at = { 25, 256 }, weapon = "Microwave" },
+      { type = "Panther", at = { 27, 256 }, weapon = "RPG" },
+    },  -- 0x1100C8D8
+    Hard = {
+      { type = "Lynx", at = { 19, 256 }, weapon = "EMP" },
+      { type = "Lynx", at = { 21, 256 }, weapon = "Microwave" },
+      { type = "Panther", at = { 23, 256 }, weapon = "RPG" },
+      { type = "Lynx", at = { 25, 256 }, weapon = "Microwave" },
+      { type = "Panther", at = { 27, 256 }, weapon = "RPG" },
+    },  -- 0x1100C8D8
+  },
+  M1 = {
+    Easy = {
+      { type = "Lynx", at = { 1, 134 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 1, 136 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 1, 138 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 1, 140 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 1, 142 }, weapon = "Starflare" },
+      { type = "Lynx", at = { 1, 144 }, weapon = "Starflare" },
+      { type = "Lynx", at = { 1, 146 }, weapon = "EMP" },
+      { type = "Lynx", at = { 1, 148 }, weapon = "EMP" },
+      { type = "Panther", at = { 2, 133 }, weapon = "RPG" },
+      { type = "Panther", at = { 2, 135 }, weapon = "RPG" },
+    },  -- 0x1100C520
+    Normal = {
+      { type = "Lynx", at = { 1, 134 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 1, 136 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 1, 138 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 1, 140 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 1, 142 }, weapon = "Starflare" },
+      { type = "Lynx", at = { 1, 144 }, weapon = "Starflare" },
+      { type = "Lynx", at = { 1, 146 }, weapon = "EMP" },
+      { type = "Lynx", at = { 1, 148 }, weapon = "EMP" },
+      { type = "Panther", at = { 2, 133 }, weapon = "RPG" },
+      { type = "Panther", at = { 2, 135 }, weapon = "RPG" },
+    },  -- 0x1100C520
+    Hard = {
+      { type = "Lynx", at = { 1, 134 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 1, 136 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 1, 138 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 1, 140 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 1, 142 }, weapon = "Starflare" },
+      { type = "Lynx", at = { 1, 144 }, weapon = "Starflare" },
+      { type = "Lynx", at = { 1, 146 }, weapon = "EMP" },
+      { type = "Lynx", at = { 1, 148 }, weapon = "EMP" },
+      { type = "Panther", at = { 2, 133 }, weapon = "RPG" },
+      { type = "Panther", at = { 2, 135 }, weapon = "RPG" },
+    },  -- 0x1100C520
+  },
+  M2 = {
+    Hard = {
+      { type = "Lynx", at = { 150, 2 }, weapon = "EMP" },
+      { type = "Lynx", at = { 152, 2 }, weapon = "Microwave" },
+      { type = "Lynx", at = { 154, 2 }, weapon = "EMP" },
+      { type = "Lynx", at = { 156, 2 }, weapon = "Starflare" },
+    },  -- 0x1100C5A8
+  },
+  M3 = {
+    Easy = {
+      { type = "Tiger", at = { 101, 2 }, weapon = "Starflare" },
+      { type = "Tiger", at = { 103, 2 }, weapon = "RPG" },
+      { type = "Tiger", at = { 105, 2 }, weapon = "RPG" },
+      { type = "Tiger", at = { 106, 2 }, weapon = "EMP" },
+    },  -- 0x1100CD28
+    Normal = {
+      { type = "Tiger", at = { 101, 2 }, weapon = "Starflare" },
+      { type = "Tiger", at = { 103, 2 }, weapon = "RPG" },
+      { type = "Tiger", at = { 105, 2 }, weapon = "RPG" },
+      { type = "Tiger", at = { 106, 2 }, weapon = "EMP" },
+    },  -- 0x1100CD28
+    Hard = {
+      { type = "Tiger", at = { 101, 2 }, weapon = "Starflare" },
+      { type = "Tiger", at = { 103, 2 }, weapon = "RPG" },
+      { type = "Tiger", at = { 105, 2 }, weapon = "RPG" },
+      { type = "Tiger", at = { 106, 2 }, weapon = "EMP" },
+    },  -- 0x1100C630
+  },
+  B1 = {
+    Easy = {
+      { type = "Lynx", at = { 113, 2 }, weapon = "Starflare" },
+      { type = "Lynx", at = { 115, 2 }, weapon = "Starflare" },
+      { type = "Lynx", at = { 117, 2 }, weapon = "Starflare" },
+      { type = "Panther", at = { 114, 2 }, weapon = "EMP" },
+      { type = "Panther", at = { 116, 2 }, weapon = "Supernova" },
+    },  -- 0x1100C2F0
+    Normal = {
+      { type = "Lynx", at = { 113, 2 }, weapon = "Starflare" },
+      { type = "Lynx", at = { 115, 2 }, weapon = "Starflare" },
+      { type = "Lynx", at = { 117, 2 }, weapon = "Starflare" },
+      { type = "Panther", at = { 114, 2 }, weapon = "EMP" },
+      { type = "Panther", at = { 116, 2 }, weapon = "Supernova" },
+    },  -- 0x1100C2F0
+    Hard = {
+      { type = "Lynx", at = { 113, 2 }, weapon = "Starflare" },
+      { type = "Lynx", at = { 115, 2 }, weapon = "Starflare" },
+      { type = "Lynx", at = { 117, 2 }, weapon = "Starflare" },
+      { type = "Panther", at = { 114, 2 }, weapon = "EMP" },
+      { type = "Panther", at = { 116, 2 }, weapon = "Supernova" },
+    },  -- 0x1100C2F0
+  },
+  B2 = {
+    Hard = {
+      { type = "Tiger", at = { 101, 2 }, weapon = "Supernova" },
+      { type = "Tiger", at = { 103, 2 }, weapon = "Supernova" },
+      { type = "Tiger", at = { 105, 2 }, weapon = "Supernova" },
+    },  -- 0x1100C378
+  },
+  B3 = {
+    Easy = {
+      { type = "Lynx", at = { 1, 134 }, weapon = "RPG" },
+      { type = "Lynx", at = { 1, 136 }, weapon = "EMP" },
+      { type = "Lynx", at = { 1, 138 }, weapon = "RPG" },
+      { type = "Lynx", at = { 1, 140 }, weapon = "Starflare" },
+      { type = "Lynx", at = { 1, 142 }, weapon = "RPG" },
+      { type = "Lynx", at = { 1, 144 }, weapon = "Starflare" },
+    },  -- 0x1100C400
+    Normal = {
+      { type = "Lynx", at = { 1, 134 }, weapon = "RPG" },
+      { type = "Lynx", at = { 1, 136 }, weapon = "EMP" },
+      { type = "Lynx", at = { 1, 138 }, weapon = "RPG" },
+      { type = "Lynx", at = { 1, 140 }, weapon = "Starflare" },
+      { type = "Lynx", at = { 1, 142 }, weapon = "RPG" },
+      { type = "Lynx", at = { 1, 144 }, weapon = "Starflare" },
+    },  -- 0x1100C400
+    Hard = {
+      { type = "Lynx", at = { 1, 134 }, weapon = "RPG" },
+      { type = "Lynx", at = { 1, 136 }, weapon = "EMP" },
+      { type = "Lynx", at = { 1, 138 }, weapon = "RPG" },
+      { type = "Lynx", at = { 1, 140 }, weapon = "Starflare" },
+      { type = "Lynx", at = { 1, 142 }, weapon = "RPG" },
+      { type = "Lynx", at = { 1, 144 }, weapon = "Starflare" },
+    },  -- 0x1100C400
+  },
+  B4 = {
+    Normal = {
+      { type = "Panther", at = { 1, 191 }, weapon = "EMP" },
+      { type = "Panther", at = { 1, 191 }, weapon = "Supernova" },
+      { type = "Tiger", at = { 1, 191 }, weapon = "RPG" },
+      { type = "Tiger", at = { 1, 191 }, weapon = "RPG" },
+    },  -- 0x1100C488
+    Hard = {
+      { type = "Panther", at = { 1, 191 }, weapon = "EMP" },
+      { type = "Panther", at = { 1, 191 }, weapon = "Supernova" },
+      { type = "Tiger", at = { 1, 191 }, weapon = "RPG" },
+      { type = "Tiger", at = { 1, 191 }, weapon = "RPG" },
+    },  -- 0x1100C488
+  },
+}
+
+-- The research flags the raids read (0x1100CC00 to 0x1100CC10: each set by its topic's trigger, cleared by the raid
+-- that adds its units), whether Medical and Big research came (0x1100CBD8, 0x1100CBDC), the raids' group (0x1100CBE8,
+-- made by the first raid) and NextWave's third group (0x1100CBE0, for ChangeTarget).
+local res_done = { Starflare = false, RailGun = false, EMP = false, Acid = false, Thor = false }
+local med_done, big_done = false, false
+local raid_group, next_wave3
+-- Where the waves attack (0x1100CBC8), where a raid comes in (0x1100CB00, 0x1100CB10, 0x1100CB20, 0x1100CBB8; the
+-- draw's order at 0x11005188) and where BigWave2 and BigWave3 make their row (x 134 + i, y 255 in game tiles).
+local WAVE_AREA = { 22, 39, 51, 54 }
+local RAID_SPOTS = { { 1, 133 }, { 12, 256 }, { 111, 2 }, { 136, 2 } }
+-- A raid's extra units for the first research flag set, in that order (0x11004501 to 0x11005180), on Hard and
+-- otherwise; all on the tile of the raid's last unit.
+local RAID_FLAGS = { "Starflare", "RailGun", "EMP", "Acid", "Thor" }
+local SPIDER, SCORPION = { "Spider" }, { "Scorpion", "EnergyCannon" }
+local RAID_EXTRA = {
+  Starflare = { Other = { { "Panther", "RPG" }, SPIDER, SPIDER, { "Lynx", "Stickyfoam" } } },
+  RailGun = {
+    Hard = { { "Lynx", "Stickyfoam" }, { "Panther", "EMP" }, { "Panther", "EMP" }, { "Tiger", "RPG" }, SPIDER, SPIDER, SPIDER, SPIDER },
+    Other = { { "Lynx", "Stickyfoam" }, { "Tiger", "EMP" }, SCORPION, SCORPION, SCORPION, SPIDER, SPIDER, SPIDER, SPIDER },
+  },
+  EMP = {
+    Hard = { { "Panther", "Stickyfoam" }, { "Tiger", "EMP" }, SCORPION, SCORPION, SCORPION, SCORPION, SPIDER, SPIDER, SPIDER, SPIDER },
+    Other = { { "Tiger", "RPG" }, SCORPION, SCORPION, SCORPION, SCORPION, SCORPION, SCORPION, SCORPION, SCORPION },
+  },
+  Acid = {
+    Hard = { { "Tiger", "RPG" }, { "Tiger", "RPG" }, { "Lynx", "ESG" }, { "Lynx", "ESG" }, SCORPION, SCORPION, SCORPION, SCORPION },
+    Other = { { "Lynx", "ESG" }, { "Lynx", "ESG" }, { "Tiger", "ESG" } },
+  },
+  Thor = {
+    Hard = { { "Lynx", "Supernova" }, { "Lynx", "Supernova" }, { "Tiger", "ESG" }, { "Lynx", "EMP" }, { "Lynx", "EMP" } },
+    Other = { { "Lynx", "ESG" }, { "Panther", "ESG" }, { "Panther", "EMP" }, SPIDER, SPIDER, SPIDER, SPIDER, { "Tiger", "RPG" } },
+  },
+}
+-- BigWave2's and BigWave3's weapons, by how many of the type the wave has made so far (0x11004054..., 0x110042A0...).
+local ROW_WEAPONS = {
+  [2] = { Lynx = { "Microwave", "EMP", "Microwave", "Starflare" }, Panther = { "Supernova", "EMP", "Microwave" },
+          Tiger = { "RPG", "Starflare", "RPG", "Starflare", "RPG", "Supernova", "RPG", "EMP" } },
+  [3] = { Lynx = { "Microwave", "EMP", "Microwave", "Stickyfoam" }, Panther = { "RPG", "EMP", "Microwave" },
+          Tiger = { "RPG", "Starflare", "RPG", "RPG", "RPG", "Stickyfoam", "RPG", "EMP" } },
+}
+
+-- A unit of player 2's on a tile, as the DLL's TethysGame::CreateUnit makes it (no placement search, lights off).
+local function cep1_unit(kind, at)
+  return game.create_unit{ type = kind[1], weapon = kind[2], player = players[2], at = at, exact = true, lights = false }[1]
+end
+-- A wave: a fight group of player 2's that attacks the area, with a table's units, lights on.
+local function attack_wave(units, attack)
+  local g = ai.fight_group(players[2])
+  if attack ~= false then g:do_attack_enemy() end
+  g:set_rect(WAVE_AREA)
+  g:add_units(ai.unit_block(units))
+  g:set_lights(true)
+  return g
+end
+local function wave_units(name) return WAVE_UNITS[name][players[1].difficulty] or WAVE_UNITS[name].Normal end
+-- BigWave2's and BigWave3's row: one unit per tank player 1 has (Scorpions, Lynxes, Panthers, Tigers), scaled by
+-- `share`, Lynx, Panther, Lynx, Tiger in turn.
+local function tank_row(table_no, share)
+  local g = ai.fight_group(players[2])
+  g:do_attack_enemy()
+  g:set_rect(WAVE_AREA)
+  local n = 0
+  for _, u in ipairs(players[1]:units()) do
+    if u.is_vehicle and (u.type == "Scorpion" or u.type == "Lynx" or u.type == "Panther" or u.type == "Tiger") then n = n + 1 end
+  end
+  local made, weapons = { Lynx = 0, Panther = 0, Tiger = 0 }, ROW_WEAPONS[table_no]
+  for i = 0, share(n) - 1 do
+    local kind = ({ "Lynx", "Panther", "Lynx", "Tiger" })[i % 4 + 1]
+    local list = weapons[kind]
+    local weapon = list[made[kind] % #list + 1]
+    made[kind] = made[kind] + 1
+    local u = cep1_unit({ kind, weapon }, { 103 + i, 256 })
+    if u then g:take_unit(u) end
+  end
+  g:set_lights(true)
+end
 
 -- Disasters and timed events: what the mission's trigger functions did over 600 calls each, with
 -- the same draws of the game's random numbers. Each is called with the trigger that fired.
@@ -1019,6 +1362,167 @@ function ReleaseMorale(t)
   game.free_morale()
 end
 
+-- Player 1 has researched Starflare: the next raid brings its units (0x11002BB0).
+function ResStarflare(t)
+  res_done.Starflare = true
+end
+
+-- Player 1 has researched RailGun: the next raid brings its units (0x11002BC0).
+function ResRailGun(t)
+  res_done.RailGun = true
+end
+
+-- Player 1 has researched EMP: the next raid brings its units (0x11002BD0).
+function ResEMP(t)
+  res_done.EMP = true
+end
+
+-- Player 1 has researched Acid: the next raid brings its units (0x11002BE0).
+function ResAcid(t)
+  res_done.Acid = true
+end
+
+-- Player 1 has researched Thor: the next raid brings its units (0x11002BF0).
+function ResThor(t)
+  res_done.Thor = true
+end
+
+-- A research topic finished: FirstAttack 12 to 60 marks later, but on Easy (0x11003510).
+function ResearchedWeapons(t)
+  if players[1].difficulty ~= "Easy" then trigger.time{min = 1200, max = 6000, on = FirstAttack} end
+end
+
+-- A research topic finished: MedWave 12 to 60 marks later, but on Easy (0x11003560).
+function ResearchedMed(t)
+  med_done = true
+  if players[1].difficulty ~= "Easy" then trigger.time{min = 1200, max = 6000, on = MedWave} end
+end
+
+-- A research topic finished: BigWave 12 to 60 marks later, but on Easy (0x110035B0).
+function ResearchedBig(t)
+  big_done = true
+  if players[1].difficulty ~= "Easy" then trigger.time{min = 1200, max = 6000, on = BigWave} end
+end
+
+-- The first wave (0x11003600); SecondAttack 30 marks later.
+function FirstAttack(t)
+  attack_wave(wave_units("G1"))
+  trigger.time{time = 3000, on = SecondAttack}
+end
+
+-- The second wave (0x110036C0); raids every 30 to 60 marks from now; on Hard, once it is all destroyed, WaitForMore.
+function SecondAttack(t)
+  local g = attack_wave(wave_units("G2"))
+  trigger.time{min = 3000, max = 6000, one_shot = false, on = Annoyance}
+  if players[1].difficulty == "Hard" then trigger.damaged{group = g, damage = 1, one_shot = true, on = WaitForMore} end
+end
+
+-- NextWave once player 1 has more than 9 Lynxes (0x110037C0).
+function WaitForMore(t)
+  trigger.count{type = "Lynx", compare = ">", count = 9, player = 1, one_shot = true, on = NextWave}
+end
+
+-- Three groups (0x11003800): two attack, the third only guards the area until it takes damage (ChangeTarget);
+-- Reinforce once player 1 has few vehicles left (25 on Easy, 2 on Normal, 3 on Hard).
+function NextWave(t)
+  local level = players[1].difficulty
+  attack_wave(wave_units("GN1"))
+  attack_wave(wave_units("GN2"))
+  next_wave3 = attack_wave(wave_units("GN3"), false)
+  trigger.damaged{group = next_wave3, damage = ({ Easy = 1, Normal = 4, Hard = 6 })[level] or 4, one_shot = true, on = ChangeTarget}
+  trigger.vehicle_count{compare = "<=", count = ({ Easy = 25, Normal = 2, Hard = 3 })[level] or 2, player = 1, one_shot = true, on = Reinforce}
+end
+
+-- A last wave (0x11003A50).
+function Reinforce(t)
+  attack_wave(wave_units("GN4"))
+end
+
+-- NextWave's third group goes for Common Ore Mines (0x11003AC0).
+function ChangeTarget(t)
+  next_wave3:set_attack_type("CommonOreMine")
+end
+
+-- After Medical research (0x11003AD0): a wave, a second on Hard; MedWave2 3 to 5 marks later.
+function MedWave(t)
+  attack_wave(wave_units("M1"))
+  if players[1].difficulty == "Hard" then attack_wave(wave_units("M2")) end
+  trigger.time{min = 300, max = 500, on = MedWave2}
+end
+
+-- MedWave's follow-up (0x11003BE0).
+function MedWave2(t)
+  attack_wave(wave_units("M3"))
+end
+
+-- After the big research (0x11003C80): two waves, three on Normal, four on Hard; BigWave2 15 to 20 marks later.
+function BigWave(t)
+  local level = players[1].difficulty
+  attack_wave(wave_units("B1"))
+  if level == "Hard" then attack_wave(wave_units("B2")) end
+  attack_wave(wave_units("B3"))
+  if level ~= "Easy" then attack_wave(wave_units("B4")) end
+  trigger.time{min = 1500, max = 2000, on = BigWave2}
+end
+
+-- A row of tanks for player 1's: half as many on Easy, 3/4 on Normal, as many on Hard (0x11003E40).
+function BigWave2(t)
+  local level = players[1].difficulty
+  tank_row(2, function(n)
+    if level == "Easy" then return n // 2 elseif level == "Normal" then return n * 3 // 4 end
+    return n
+  end)
+end
+
+-- At 470 and 540 colonists (and 630 and 690 on Hard): a row of half as many tanks as player 1 has (0x110040A0).
+function BigWave3(t)
+  tank_row(3, function(n) return n // 2 end)
+end
+
+-- A raid, every 30 to 60 marks after SecondAttack (0x110042E0): 1-2 units on Easy, 2-4 on Normal, 3-6 on Hard, 2 more
+-- after Medical research and 1 more after the big one, at a drawn entry, a tile further south each: Lynxes with
+-- Microwaves (or Starflares, on a draw, after Medical) and Panthers, the first with EMP, the others RPG (or
+-- Supernova, on a draw, after the big research). They join the raids' group, which keeps to the area. The first
+-- research flag set adds its units too, and is cleared.
+function Annoyance(t)
+  local level = players[1].difficulty
+  local n
+  if level == "Easy" then n = game.rand(2) + 1 elseif level == "Hard" then n = game.rand(4) + 3 else n = game.rand(3) + 2 end
+  if med_done then n = n + 2 end
+  if big_done then n = n + 1 end
+  if not raid_group then
+    raid_group = ai.fight_group(players[2])
+    raid_group:set_rect(WAVE_AREA)
+    raid_group:set_lights(true)
+  end
+  local spot = RAID_SPOTS[game.rand(4) + 1]
+  local at, emp_given = spot, false
+  for i = 0, n - 1 do
+    at = { spot[1], spot[2] + i }
+    local kind
+    if i % 2 == 0 then
+      kind = { "Lynx", med_done and game.rand(2) == 0 and "Starflare" or "Microwave" }
+    elseif not emp_given then
+      emp_given, kind = true, { "Panther", "EMP" }
+    else
+      kind = { "Panther", big_done and game.rand(2) == 0 and "Supernova" or "RPG" }
+    end
+    local u = cep1_unit(kind, at)
+    if u then raid_group:take_unit(u) end
+  end
+  for _, flag in ipairs(RAID_FLAGS) do
+    if res_done[flag] then
+      res_done[flag] = false
+      local extra = RAID_EXTRA[flag]
+      for _, kind in ipairs(level == "Hard" and extra.Hard or extra.Other) do
+        local u = cep1_unit(kind, at)
+        if u then raid_group:take_unit(u) end
+      end
+      break
+    end
+  end
+end
+
 function on_init()
   local difficulty = DIFFICULTIES[players[1].difficulty] and players[1].difficulty or "Normal"
   local d = DIFFICULTIES[difficulty]
@@ -1077,12 +1581,12 @@ function on_init()
     trigger.resource{resource = "Colonists", compare = ">", amount = 90, player = 1, one_shot = true, on = TornadoRepeat}
     trigger.resource{resource = "Colonists", compare = ">", amount = 280, player = 1, one_shot = true, on = MeteorRepeat}
     trigger.time{min = 8000, max = 13000, one_shot = false, on = Quake}  -- after 80 to 130 marks
-    trigger.research{tech = 3851, player = 1, one_shot = true, on = ResearchedWeapons}  -- ResearchedWeapons isn't converted
-    trigger.research{tech = 5201, player = 1, one_shot = true, on = ResearchedMed}  -- ResearchedMed isn't converted
-    trigger.research{tech = 8201, player = 1, one_shot = true, on = ResearchedBig}  -- ResearchedBig isn't converted
+    trigger.research{tech = 3851, player = 1, one_shot = true, on = ResearchedWeapons}
+    trigger.research{tech = 5201, player = 1, one_shot = true, on = ResearchedMed}
+    trigger.research{tech = 8201, player = 1, one_shot = true, on = ResearchedBig}
     trigger.time{time = 7000, on = ScoutArrive}  -- after 70 marks
-    trigger.resource{resource = "Colonists", compare = ">", amount = 470, player = 1, one_shot = true, on = BigWave3}  -- BigWave3 isn't converted
-    trigger.resource{resource = "Colonists", compare = ">", amount = 540, player = 1, one_shot = true, on = BigWave3}  -- BigWave3 isn't converted
+    trigger.resource{resource = "Colonists", compare = ">", amount = 470, player = 1, one_shot = true, on = BigWave3}
+    trigger.resource{resource = "Colonists", compare = ">", amount = 540, player = 1, one_shot = true, on = BigWave3}
   elseif difficulty == "Hard" then
     trigger.resource{resource = "Colonists", compare = ">", amount = 200, player = 1, one_shot = true, on = Lava}
     trigger.resource{resource = "Colonists", compare = ">", amount = 360, player = 1, one_shot = true, on = Lava}
@@ -1092,30 +1596,20 @@ function on_init()
     trigger.resource{resource = "Colonists", compare = ">", amount = 360, player = 1, one_shot = true, on = MeteorRepeat}
     trigger.time{min = 8000, max = 12000, one_shot = false, on = Quake}  -- after 80 to 120 marks
     trigger.resource{resource = "Colonists", compare = ">", amount = 500, player = 1, one_shot = true, on = BigQuake}
-    trigger.research{tech = 3851, player = 1, one_shot = true, on = ResearchedWeapons}  -- ResearchedWeapons isn't converted
-    trigger.research{tech = 5201, player = 1, one_shot = true, on = ResearchedMed}  -- ResearchedMed isn't converted
-    trigger.research{tech = 8201, player = 1, one_shot = true, on = ResearchedBig}  -- ResearchedBig isn't converted
+    trigger.research{tech = 3851, player = 1, one_shot = true, on = ResearchedWeapons}
+    trigger.research{tech = 5201, player = 1, one_shot = true, on = ResearchedMed}
+    trigger.research{tech = 8201, player = 1, one_shot = true, on = ResearchedBig}
     trigger.time{time = 7000, on = ScoutArrive}  -- after 70 marks
-    trigger.resource{resource = "Colonists", compare = ">", amount = 470, player = 1, one_shot = true, on = BigWave3}  -- BigWave3 isn't converted
-    trigger.resource{resource = "Colonists", compare = ">", amount = 540, player = 1, one_shot = true, on = BigWave3}  -- BigWave3 isn't converted
-    trigger.resource{resource = "Colonists", compare = ">", amount = 630, player = 1, one_shot = true, on = BigWave3}  -- BigWave3 isn't converted
-    trigger.resource{resource = "Colonists", compare = ">", amount = 690, player = 1, one_shot = true, on = BigWave3}  -- BigWave3 isn't converted
+    trigger.resource{resource = "Colonists", compare = ">", amount = 470, player = 1, one_shot = true, on = BigWave3}
+    trigger.resource{resource = "Colonists", compare = ">", amount = 540, player = 1, one_shot = true, on = BigWave3}
+    trigger.resource{resource = "Colonists", compare = ">", amount = 630, player = 1, one_shot = true, on = BigWave3}
+    trigger.resource{resource = "Colonists", compare = ">", amount = 690, player = 1, one_shot = true, on = BigWave3}
   end
-  trigger.research{tech = 7102, player = 1, one_shot = true, on = ResStarflare}  -- ResStarflare isn't converted
-  trigger.research{tech = 5506, player = 1, one_shot = true, on = ResRailGun}  -- ResRailGun isn't converted
-  trigger.research{tech = 5508, player = 1, one_shot = true, on = ResEMP}  -- ResEMP isn't converted
-  trigger.research{tech = 8503, player = 1, one_shot = true, on = ResAcid}  -- ResAcid isn't converted
-  trigger.research{tech = 10102, player = 1, one_shot = true, on = ResThor}  -- ResThor isn't converted
+  trigger.research{tech = 7102, player = 1, one_shot = true, on = ResStarflare}
+  trigger.research{tech = 5506, player = 1, one_shot = true, on = ResRailGun}
+  trigger.research{tech = 5508, player = 1, one_shot = true, on = ResEMP}
+  trigger.research{tech = 8503, player = 1, one_shot = true, on = ResAcid}
+  trigger.research{tech = 10102, player = 1, one_shot = true, on = ResThor}
   trigger.time{time = 40, one_shot = false, on = CheckForFail}  -- after 0 marks
 end
 
--- Not converted:
--- - BigWave3 isn't converted: it calls CreateFightGroup
--- - ResAcid isn't converted: it calls nothing
--- - ResEMP isn't converted: it calls nothing
--- - ResRailGun isn't converted: it calls nothing
--- - ResStarflare isn't converted: it calls nothing
--- - ResThor isn't converted: it calls nothing
--- - ResearchedBig isn't converted: it calls nothing
--- - ResearchedMed isn't converted: it calls nothing
--- - ResearchedWeapons isn't converted: it calls nothing

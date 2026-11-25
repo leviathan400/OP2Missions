@@ -1217,4 +1217,3 @@ function on_init()
   scout_trigger = trigger.time{time = 8000, one_shot = false, on = ScoutWave}  -- after 80 marks
 end
 
--- Not converted:

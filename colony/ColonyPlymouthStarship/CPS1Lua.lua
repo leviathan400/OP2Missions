@@ -700,4 +700,3 @@ function on_init()
   trigger.time{min = 7000, max = 8000, one_shot = false, on = ScoutWait}  -- after 70 to 80 marks
 end
 
--- Not converted:

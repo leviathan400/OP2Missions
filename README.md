@@ -46,11 +46,16 @@ colonists by difficulty, or the starship's cargo), the failure checks, the disas
 bases, AI groups and attack waves are converted, some of the computer players' functions written by hand from the
 original's rules. All five matched their originals in OP2TestHarness at all three difficulties (seed 1, nobody playing,
 40,000 ticks or until the colony fails): every unit's id, owner, type, weapon, position and hit points and the game's
-random numbers on every tick, the computer players' units included. Plymouth Starship II's attack waves and Easy
-leaving, which come only once player 1 has a Command Center, were also checked with scripted input that keeps the colony
-going (a Command Center, people and food topped up, tanks): they match at all three difficulties until the mission
-ends. A few functions the original reaches only later in a game are still empty and listed in each `.lua`: Eden
-Population's research waves, and Eden Starship's rare ore checks and one base expansion.
+random numbers on every tick, the computer players' units included. Two sets of functions come only with a player's
+help and were checked with scripted input that keeps the colony going (Command Centers, people and food topped up,
+tanks), every object and the object allocator compared too:
+- Plymouth Starship II's attack waves and Easy leaving, once player 1 has a Command Center: they match at all three
+  difficulties until the mission ends.
+- Eden Population's waves and raids, set off by player 1's research (weapons, medical, the big topic and five weapon
+  topics the raids answer): Easy (which has none) until the colony is won, Normal for 80,000 ticks, Hard until the
+  colony fails.
+
+Still empty, and listed in its `.lua`: Eden Starship's rare ore checks and one base expansion.
 
 **Tutorials:** their setups are the same at every difficulty and roll nothing, and the DLLs make only the start and
 the objectives (the guidance comes from the game itself), so each is converted whole. All 14 matched their originals
