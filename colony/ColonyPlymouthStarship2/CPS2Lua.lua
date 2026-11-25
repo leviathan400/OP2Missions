@@ -1,5 +1,5 @@
 -- CPS2Lua.lua  -  Colony Builder II - Plymouth, Starship (Lua)
--- Trigger functions finished by hand (CheckForFail, DoMeteor, DoQuake, DoLightning, DoTornado, GiveAIOre, Microbe, Base1RareCheck, Base1BSmelterCheck, Base3SmelterCheck, Base3RareSmelterCheck, Base3Finish, BasePlaced), from the disassembly of CPS2.dll.
+-- Trigger functions finished by hand (CheckForFail, DoMeteor, DoQuake, DoLightning, DoTornado, GiveAIOre, SpawnAttack, SpawnDone, ExitMapMultiple, Microbe, Base1RareCheck, Base1BSmelterCheck, Base3SmelterCheck, Base3RareSmelterCheck, Base3Finish, BasePlaced), from the disassembly of CPS2.dll.
 -- Converted by op2dll from CPS2.dll. With CPS2Lua.placement.lua (what every difficulty makes alike),
 -- this makes the colony's start: what changes with the difficulty, and the beacons the setup rolls.
 -- Games run: Easy 505, Normal 610, Hard 542.
@@ -522,9 +522,39 @@ local function wild_tile()
   return { x - 31, y + 1 }
 end
 
--- The computer's attack waves and its leaving, not converted yet (SpawnAttack, ExitMapMultiple).
-function SpawnAttack(t) end
-function ExitMapMultiple(t) end
+-- The computer's three wave groups (0x1100CDB0, 0x1100CDB4, 0x1100CDB8) and how many waves have come (0x1100CE04); the
+-- time between waves by difficulty (0x1100CE00).
+local wave_groups, waves = {}, 0
+local WAVE_PERIOD = { Easy = 10000, Normal = 15000, Hard = 14000 }
+-- Where the waves gather (0x1100CE28, 0x1100CE38, 0x1100CE48), where the Easy leaving goes (0x1100CB80 twice,
+-- 0x1100CB90), and the two areas where player 1's defence calls a wave off (0x1100CC50, 0x1100CBC0).
+local WAVE_RECTS = { { 176, 77, 188, 96 }, { 176, 53, 184, 78 }, { 71, 72, 79, 93 } }
+local EXIT_RECTS = { { 256, 28, 257, 48 }, { 256, 28, 257, 48 }, { 0, 101, 2, 121 } }
+local DEFENCE_AREAS = { { 1, 2, 81, 128 }, { 174, 2, 256, 128 } }
+
+-- Moves units of `from` to `to` (0x110027A0): each for which a draw of 100 comes to `share` or less, at most 30;
+-- then, when none of them had a Laser, the first of `from` that has one.
+local function take_share(from, to, share)
+  local taken, lasers = 0, 0
+  for _, u in ipairs(from:units()) do
+    if game.rand(100) <= share then
+      if u.weapon == "Laser" then lasers = lasers + 1 end
+      taken = taken + 1
+      from:remove_unit(u)
+      to:take_unit(u)
+      if taken >= 30 then break end
+    end
+  end
+  if lasers == 0 then
+    for _, u in ipairs(from:units()) do
+      if u.weapon == "Laser" then
+        from:remove_unit(u)
+        to:take_unit(u)
+        break
+      end
+    end
+  end
+end
 
 -- Disasters and timed events: what the mission's trigger functions did over 600 calls each, with
 -- the same draws of the game's random numbers. Each is called with the trigger that fired.
@@ -1437,7 +1467,7 @@ function TimeUpgrades(t)
     ai_fight1:set_targ_count("Tiger", "ThorsHammer", 12)
     ai_fight2:set_targ_count("Tiger", "ThorsHammer", 12)
     ai_fight3:set_targ_count("Tiger", "ThorsHammer", 12)
-  else
+  elseif TimeUpgrades_step >= 12 then
     ai_fight4:set_delete_when_empty(true)
     t:destroy()
   end
@@ -1492,6 +1522,99 @@ function GiveAIOre(t)
   local level = players[1].difficulty
   players[2].ore = (AI_ORE[level] or 2000) + players[2].ore + early
   players[2].rare_ore = (AI_RARE_ORE[level] or 300) + players[2].rare_ore
+end
+
+-- A wave of the computer's (0x11002320): three new groups gather, one each where fight groups 1, 2 and 3 guard. The
+-- first wave is one Laser Lynx for the scouts' group, the second a Laser Lynx for each of the last two; from the third
+-- each group takes units of its fight group by a draw against a share: 33 (66 when player 2 has more than 8000 ore),
+-- at most player 1's strength (7/8 on Normal) * 100 over the three groups' units (5/4 of them from the ninth upgrade,
+-- again from the twelfth), at least the tick / 13000 on Normal, / 11000 otherwise. The wave goes at once when player 1
+-- has more than 6 tanks in either end of the map, or on a draw of 100 under 10; else in 30 marks, its lights off on a
+-- draw under 20.
+function SpawnAttack(t)
+  wave_groups = {}
+  for i = 1, 3 do
+    wave_groups[i] = ai.fight_group(players[2])
+    wave_groups[i]:do_guard_rect()
+    wave_groups[i]:set_rect(WAVE_RECTS[i])
+  end
+  waves = waves + 1
+  local level = players[1].difficulty
+  if waves == 1 then
+    if ai_fight4 and ai_fight4.valid then
+      local u = game.create_unit{ type = "Lynx", weapon = "Laser", player = players[2], at = { 180, 151 }, exact = true, lights = false }[1]
+      if u then ai_fight4:take_unit(u) end
+    end
+  elseif waves < 3 then
+    local u = game.create_unit{ type = "Lynx", weapon = "Laser", player = players[2], at = { 251, 51 }, exact = true, lights = false }[1]
+    if u then wave_groups[2]:take_unit(u) end
+    u = game.create_unit{ type = "Lynx", weapon = "Laser", player = players[2], at = { 48, 103 }, exact = true, lights = false }[1]
+    if u then wave_groups[3]:take_unit(u) end
+  else
+    local share = players[2].ore > 8000 and 66 or 33
+    local strength = players[1]:total_strength()
+    if level == "Normal" then strength = strength * 7 // 8 end
+    local count = ai_fight1:unit_count() + ai_fight2:unit_count() + ai_fight3:unit_count()
+    -- TimeUpgrades' count as the DLL keeps it (0x1100CE08).
+    local step = TimeUpgrades_step + 1
+    if step >= 9 then count = count * 5 // 4 end
+    if step >= 12 then count = count * 5 // 4 end
+    if count == 0 then count = 1 end
+    share = math.min(share, strength * 100 // count)
+    share = math.max(share, game.tick() // (level == "Normal" and 13000 or 11000))
+    take_share(ai_fight1, wave_groups[1], share)
+    take_share(ai_fight2, wave_groups[2], share)
+    take_share(ai_fight3, wave_groups[3], share)
+  end
+  -- The DLL walks player 1's units with PlayerUnitEnum, which lists vehicles only: its checks for a Command Center
+  -- and Guard Posts never match (measured: a Command Center in the area doesn't send the wave), so only tanks count.
+  for _, area in ipairs(DEFENCE_AREAS) do
+    local n = 0
+    for _, u in ipairs(players[1]:units()) do
+      if u.is_vehicle and in_rect(u.x, u.y, area) and (u.type == "Lynx" or u.type == "Panther" or u.type == "Tiger") then
+        n = n + 1
+      end
+    end
+    if n > 6 then return SpawnDone(t) end
+  end
+  if game.rand(100) < 10 then return SpawnDone(t) end
+  attack_trigger:destroy()
+  if game.rand(100) < 20 then
+    for _, g in ipairs(wave_groups) do g:set_lights(false) end
+  end
+  attack_trigger = trigger.time{time = 3000, on = SpawnDone}
+end
+
+-- The wave sets out (0x11002230): its three groups attack, lights on, and go when empty; the next wave in the time
+-- between waves less 30 marks to half again of that less 90 marks.
+function SpawnDone(t)
+  attack_trigger:destroy()
+  for i, g in ipairs(wave_groups) do
+    g:do_attack_enemy()
+    g:set_rect(WAVE_RECTS[i])
+    g:set_lights(true)
+    g:set_delete_when_empty(true)
+  end
+  local period = WAVE_PERIOD[players[1].difficulty] or 15000
+  attack_trigger = trigger.time{min = period - 3000, max = (period * 3 - 9000) // 2, on = SpawnAttack}
+end
+
+-- Easy's move instead of a wave (0x110028F0): three new groups leave the map, two by 256,28 - 257,48 and one by
+-- 0,101 - 2,121, and go when empty; each takes units of fight group 1, 2 or 3 by a draw of 100 against 50. The next
+-- in the time between waves.
+function ExitMapMultiple(t)
+  wave_groups = {}
+  for i = 1, 3 do
+    wave_groups[i] = ai.fight_group(players[2])
+    wave_groups[i]:do_exit_map()
+    wave_groups[i]:set_rect(EXIT_RECTS[i])
+    wave_groups[i]:set_delete_when_empty(true)
+  end
+  take_share(ai_fight1, wave_groups[1], 50)
+  take_share(ai_fight2, wave_groups[2], 50)
+  take_share(ai_fight3, wave_groups[3], 50)
+  attack_trigger:destroy()
+  attack_trigger = trigger.time{time = WAVE_PERIOD[players[1].difficulty] or 15000, on = ExitMapMultiple}
 end
 
 -- At tick 350000: the Blight starts at 109,1 and 110,1, spreading at 40, and player 1 is told (0x11007E60).
@@ -1735,6 +1858,7 @@ function on_init()
 
   -- The computer player's base, where the setup makes it.
   setup_ai(players[2])
+  if difficulty == "Hard" then TimeUpgrades_step = -1 end
   if difficulty == "Easy" then
     trigger.time{time = 20000, one_shot = false, on = TimeUpgrades}  -- after 200 marks
   elseif difficulty == "Normal" then
