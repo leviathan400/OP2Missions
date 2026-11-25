@@ -47,6 +47,7 @@ local DIFFICULTIES = {
           { type = "CargoTruck", direction = "NorthEast", at = { 64, 27 } },
           { type = "CargoTruck", direction = "NorthEast", at = { 64, 30 } },
           { type = "CargoTruck", direction = "NorthEast", cargo = "CommonMetal", amount = 1000, at = { 60, 30 } },
+          { beacon = true, type = "MiningBeacon", ore = "Common", yield = "Bar3", variant = "Mid", at = { 92, 26 } },
           { type = "CommonOreMine", at = { 92, 26 } },
         },
       },
@@ -54,7 +55,6 @@ local DIFFICULTIES = {
     walls = {
     },
     beacons = {
-      { type = "MiningBeacon", ore = "Common", yield = "Bar3", variant = "Mid", at = { 92, 26 } },
     },
   },
   Normal = {
@@ -158,7 +158,13 @@ function make_player(player, p)
   for _, k in ipairs({ "ore", "rare_ore", "food", "workers", "scientists", "kids" }) do
     if p[k] then player[k] = p[k] end
   end
-  for _, u in ipairs(p.units) do make_unit(player, u, u.at, p.kits, true) end
+  for _, u in ipairs(p.units) do
+    if u.beacon then
+      game.create_beacon{ type = u.type, ore = u.ore, yield = u.yield, variant = u.variant, at = u.at }
+    else
+      make_unit(player, u, u.at, p.kits, true)
+    end
+  end
   -- As the setup draws them: the game's own MAP_RECT::RandPt.
   for _, u in ipairs(p.rolled or {}) do make_unit(player, u, game.rand_point(u.area), p.kits, true) end
   local start = p.starts and p.starts[game.rand(#p.starts) + 1]

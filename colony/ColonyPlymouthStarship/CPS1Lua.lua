@@ -1,5 +1,5 @@
 -- CPS1Lua.lua  -  Colony Builder - Plymouth, Starship (Lua)
--- Trigger functions finished by hand (CheckForFail, ScoutWait), from the disassembly of CPS1.dll.
+-- Trigger functions finished by hand (CheckForFail, ScoutWait, ReleaseMorale), from the disassembly of CPS1.dll.
 -- Converted by op2dll from CPS1.dll. With CPS1Lua.placement.lua (what every difficulty makes alike),
 -- this makes the colony's start: what changes with the difficulty, and the beacons the setup rolls.
 -- Games run: Easy 151, Normal 151, Hard 151.
@@ -416,6 +416,10 @@ local function make_unit(player, u, at, kits, exact)
   local made = game.create_unit{ type = u.type, player = player, at = at, direction = u.direction,
                                  weapon = u.weapon, lights = u.lights, exact = exact }
   if u.cargo and made[1] then made[1]:set_cargo(u.cargo, u.amount) end
+  -- A ConVec's kit with its weapon (a Guard Post kit's).
+  if u.topping and made[1] then made[1]:set_kit(u.weapon, u.topping) end
+  -- A vehicle the setup parks in a Garage: its bay, by the Garage's dock.
+  if u.garage and made[1] then made[1]:put_in_garage(u.garage.bay, u.garage.at) end
   if u.type == "StructureFactory" and kits and made[1] then
     for bay, kit in pairs(kits) do made[1]:set_factory_cargo(bay, kit[1], kit[2]) end
     kits_set = true
@@ -452,10 +456,14 @@ function make_player(player, p)
   if p.view then player:center_view(place(p.view)) end
 end
 
-function make_things(d)
-  for _, w in ipairs(d.walls) do
+function make_walls(walls)
+  for _, w in ipairs(walls) do
     if w[1] == "Tube" then game.create_tube(w[2]) else game.create_wall(w[1], w[2]) end
   end
+end
+
+function make_things(d)
+  make_walls(d.walls)
   for _, b in ipairs(d.beacons) do game.create_beacon(b) end
 end
 
@@ -638,6 +646,11 @@ function ScoutWait(t)
   t:destroy()
 end
 
+-- Easy's morale lock lasts 10 ticks: then every player's morale is free (FreeMoraleLevel(-1)).
+function ReleaseMorale(t)
+  game.free_morale()
+end
+
 function on_init()
   local difficulty = DIFFICULTIES[players[1].difficulty] and players[1].difficulty or "Normal"
   local d = DIFFICULTIES[difficulty]
@@ -662,6 +675,9 @@ function on_init()
   game.set_daylight_moves(true)
   if difficulty == "Easy" then game.morale_steady("Good") end
   for _, r in ipairs(LAVA_POSSIBLE) do game.set_lava_possible(r) end
+  if difficulty == "Easy" then
+    trigger.time{time = 10, on = ReleaseMorale}  -- after 0 marks
+  end
 
   -- The win.
   local t5 = trigger.count{type = "EvacuationModule", compare = ">=", count = 1, one_shot = true}

@@ -41,12 +41,15 @@ are still empty functions, listed at the end of each `.lua`. A mission's carry-o
 
 **Colony games:** each setup was run at Easy, Normal and Hard over many seeds. What every difficulty makes alike is in
 the placement file; the rest (extra units, colonists, stores, research, kits, morale) and the beacons the setup rolls
-are in the `.lua` by difficulty. The win (600 colonists, or the starship's cargo), the failure checks, the disasters and
-lava, and the computer players' bases, AI groups and attack waves are converted, some of the computer players' functions
-written by hand from the original's rules. All five matched their originals in OP2TestHarness (Normal, nobody playing)
-on every tick until the colony fails. A few functions the original reaches only later in a game are still empty and
-listed in each `.lua`: Eden Population's research waves, Eden Starship's rare ore checks and one base expansion, and
-Plymouth Starship II's attacks.
+are in the `.lua` by difficulty, and so are the triggers and the computer player's setup. The win (450, 600 or 750
+colonists by difficulty, or the starship's cargo), the failure checks, the disasters and lava, and the computer players'
+bases, AI groups and attack waves are converted, some of the computer players' functions written by hand from the
+original's rules. All five matched their originals in OP2TestHarness at all three difficulties (seed 1, nobody playing,
+40,000 ticks or until the colony fails): every unit's id, owner, type, weapon, position and hit points and the game's
+random numbers on every tick. The one exception is Eden Starship on Easy, from tick 28016, when the computer player
+leaves the map (`ExitMapMultiple`, not written yet). A few functions the original reaches only later in a game are still
+empty and listed in each `.lua`: Eden Population's research waves, Eden Starship's rare ore checks, one base expansion
+and Easy's leaving, and Plymouth Starship II's attacks.
 
 **Tutorials:** their setups are the same at every difficulty and roll nothing, and the DLLs make only the start and
 the objectives (the guidance comes from the game itself), so each is converted whole. All 14 matched their originals

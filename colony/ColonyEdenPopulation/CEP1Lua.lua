@@ -1,5 +1,5 @@
 -- CEP1Lua.lua  -  Colony Builder - Eden, Population (Lua)
--- Trigger functions finished by hand (CheckForFail, Lava, ScoutArrive, ScoutLeave), from the disassembly of CEP1.dll.
+-- Trigger functions finished by hand (CheckForFail, Lava, ScoutArrive, ScoutLeave, ReleaseMorale), from the disassembly of CEP1.dll.
 -- Converted by op2dll from CEP1.dll. With CEP1Lua.placement.lua (what every difficulty makes alike),
 -- this makes the colony's start: what changes with the difficulty, and the beacons the setup rolls.
 -- Games run: Easy 1124, Normal 1066, Hard 1066.
@@ -670,6 +670,10 @@ local function make_unit(player, u, at, kits, exact)
   local made = game.create_unit{ type = u.type, player = player, at = at, direction = u.direction,
                                  weapon = u.weapon, lights = u.lights, exact = exact }
   if u.cargo and made[1] then made[1]:set_cargo(u.cargo, u.amount) end
+  -- A ConVec's kit with its weapon (a Guard Post kit's).
+  if u.topping and made[1] then made[1]:set_kit(u.weapon, u.topping) end
+  -- A vehicle the setup parks in a Garage: its bay, by the Garage's dock.
+  if u.garage and made[1] then made[1]:put_in_garage(u.garage.bay, u.garage.at) end
   if u.type == "StructureFactory" and kits and made[1] then
     for bay, kit in pairs(kits) do made[1]:set_factory_cargo(bay, kit[1], kit[2]) end
     kits_set = true
@@ -706,10 +710,14 @@ function make_player(player, p)
   if p.view then player:center_view(place(p.view)) end
 end
 
-function make_things(d)
-  for _, w in ipairs(d.walls) do
+function make_walls(walls)
+  for _, w in ipairs(walls) do
     if w[1] == "Tube" then game.create_tube(w[2]) else game.create_wall(w[1], w[2]) end
   end
+end
+
+function make_things(d)
+  make_walls(d.walls)
   for _, b in ipairs(d.beacons) do game.create_beacon(b) end
 end
 
@@ -791,7 +799,13 @@ local lava_used = { false, false, false }
 
 -- Disasters and timed events: what the mission's trigger functions did over 600 calls each, with
 -- the same draws of the game's random numbers. Each is called with the trigger that fired.
-local Meteor, MeteorOnBase, MeteorRepeat, Quake, Storm, StormOnBase, StormRepeat, Tornado, TornadoRepeat, VortexOnBase
+local BigQuake, Meteor, MeteorOnBase, MeteorRepeat, Quake, Storm, StormOnBase, StormRepeat, Tornado, TornadoRepeat, VortexOnBase
+
+function BigQuake(t)
+  local r1 = game.rand(3)
+  local r2 = game.rand(3)
+  game.create_earthquake({ r2 + 194, r1 + 64 }, 3)
+end
 
 function Meteor(t)
   if players[1].difficulty == "Easy" then
@@ -964,8 +978,8 @@ function CheckForFail(t)
   end
 end
 
--- At 150, 270 and 550 colonists: one of three eruptions not yet seen, drawn again while it has been (at 175,9; at
--- 175,163; or at 163,154 and 172,150), spreading 200 (0x11002E80).
+-- At 150, 270 and 550 colonists (Easy 100, 180, 367; Hard 200, 360, 630): one of three eruptions not yet seen,
+-- drawn again while it has been (at 175,9; at 175,163; or at 163,154 and 172,150), spreading 200 (0x11002E80).
 function Lava(t)
   local i = game.rand(3)
   while lava_used[i + 1] do i = game.rand(3) end
@@ -1000,6 +1014,11 @@ function ScoutLeave(t)
   scout_group:set_rect({ 113, 1, 119, 2 })
 end
 
+-- Easy's morale lock lasts 10 ticks: then every player's morale is free (FreeMoraleLevel(-1)).
+function ReleaseMorale(t)
+  game.free_morale()
+end
+
 function on_init()
   local difficulty = DIFFICULTIES[players[1].difficulty] and players[1].difficulty or "Normal"
   local d = DIFFICULTIES[difficulty]
@@ -1024,25 +1043,64 @@ function on_init()
   game.set_daylight_moves(true)
   if difficulty == "Easy" then game.morale_steady("Good") end
   for _, r in ipairs(LAVA_POSSIBLE) do game.set_lava_possible(r) end
+  if difficulty == "Easy" then
+    trigger.time{time = 10, on = ReleaseMorale}  -- after 0 marks
+  end
 
   -- The win.
-  local t5 = trigger.resource{resource = "Colonists", compare = ">=", amount = 600, player = 1, one_shot = true}
-  mission.victory(t5, "Build your population to 600 colonists.")
+  local t6, t5
+  if difficulty == "Easy" then
+    t6 = trigger.resource{resource = "Colonists", compare = ">=", amount = 450, player = 1, one_shot = true}
+    mission.victory(t6, "Build your population to 450 colonists.")
+  elseif difficulty == "Normal" then
+    t5 = trigger.resource{resource = "Colonists", compare = ">=", amount = 600, player = 1, one_shot = true}
+    mission.victory(t5, "Build your population to 600 colonists.")
+  elseif difficulty == "Hard" then
+    t5 = trigger.resource{resource = "Colonists", compare = ">=", amount = 750, player = 1, one_shot = true}
+    mission.victory(t5, "Build your population to 750 colonists.")
+  end
   local t25 = trigger.operational{type = "CommandCenter", compare = "==", count = 0, player = 1}
   mission.failure(t25)
-  trigger.resource{resource = "Colonists", compare = ">", amount = 150, player = 1, one_shot = true, on = Lava}
-  trigger.resource{resource = "Colonists", compare = ">", amount = 270, player = 1, one_shot = true, on = Lava}
-  trigger.resource{resource = "Colonists", compare = ">", amount = 550, player = 1, one_shot = true, on = Lava}
-  trigger.resource{resource = "Colonists", compare = ">", amount = 160, player = 1, one_shot = true, on = StormRepeat}
-  trigger.resource{resource = "Colonists", compare = ">", amount = 90, player = 1, one_shot = true, on = TornadoRepeat}
-  trigger.resource{resource = "Colonists", compare = ">", amount = 280, player = 1, one_shot = true, on = MeteorRepeat}
-  trigger.time{min = 8000, max = 13000, one_shot = false, on = Quake}  -- after 80 to 130 marks
-  trigger.research{tech = 3851, player = 1, one_shot = true, on = ResearchedWeapons}  -- ResearchedWeapons isn't converted
-  trigger.research{tech = 5201, player = 1, one_shot = true, on = ResearchedMed}  -- ResearchedMed isn't converted
-  trigger.research{tech = 8201, player = 1, one_shot = true, on = ResearchedBig}  -- ResearchedBig isn't converted
-  trigger.time{time = 7000, on = ScoutArrive}  -- after 70 marks
-  trigger.resource{resource = "Colonists", compare = ">", amount = 470, player = 1, one_shot = true, on = BigWave3}  -- BigWave3 isn't converted
-  trigger.resource{resource = "Colonists", compare = ">", amount = 540, player = 1, one_shot = true, on = BigWave3}  -- BigWave3 isn't converted
+  if difficulty == "Easy" then
+    trigger.resource{resource = "Colonists", compare = ">", amount = 100, player = 1, one_shot = true, on = Lava}
+    trigger.resource{resource = "Colonists", compare = ">", amount = 180, player = 1, one_shot = true, on = Lava}
+    trigger.resource{resource = "Colonists", compare = ">", amount = 367, player = 1, one_shot = true, on = Lava}
+    trigger.resource{resource = "Colonists", compare = ">", amount = 90, player = 1, one_shot = true, on = StormRepeat}
+    trigger.resource{resource = "Colonists", compare = ">", amount = 249, player = 1, one_shot = true, on = TornadoRepeat}
+    trigger.resource{resource = "Colonists", compare = ">", amount = 52, player = 1, one_shot = true, on = MeteorRepeat}
+    trigger.time{min = 6000, max = 11000, one_shot = false, on = Quake}  -- after 60 to 110 marks
+  elseif difficulty == "Normal" then
+    trigger.resource{resource = "Colonists", compare = ">", amount = 150, player = 1, one_shot = true, on = Lava}
+    trigger.resource{resource = "Colonists", compare = ">", amount = 270, player = 1, one_shot = true, on = Lava}
+    trigger.resource{resource = "Colonists", compare = ">", amount = 550, player = 1, one_shot = true, on = Lava}
+    trigger.resource{resource = "Colonists", compare = ">", amount = 160, player = 1, one_shot = true, on = StormRepeat}
+    trigger.resource{resource = "Colonists", compare = ">", amount = 90, player = 1, one_shot = true, on = TornadoRepeat}
+    trigger.resource{resource = "Colonists", compare = ">", amount = 280, player = 1, one_shot = true, on = MeteorRepeat}
+    trigger.time{min = 8000, max = 13000, one_shot = false, on = Quake}  -- after 80 to 130 marks
+    trigger.research{tech = 3851, player = 1, one_shot = true, on = ResearchedWeapons}  -- ResearchedWeapons isn't converted
+    trigger.research{tech = 5201, player = 1, one_shot = true, on = ResearchedMed}  -- ResearchedMed isn't converted
+    trigger.research{tech = 8201, player = 1, one_shot = true, on = ResearchedBig}  -- ResearchedBig isn't converted
+    trigger.time{time = 7000, on = ScoutArrive}  -- after 70 marks
+    trigger.resource{resource = "Colonists", compare = ">", amount = 470, player = 1, one_shot = true, on = BigWave3}  -- BigWave3 isn't converted
+    trigger.resource{resource = "Colonists", compare = ">", amount = 540, player = 1, one_shot = true, on = BigWave3}  -- BigWave3 isn't converted
+  elseif difficulty == "Hard" then
+    trigger.resource{resource = "Colonists", compare = ">", amount = 200, player = 1, one_shot = true, on = Lava}
+    trigger.resource{resource = "Colonists", compare = ">", amount = 360, player = 1, one_shot = true, on = Lava}
+    trigger.resource{resource = "Colonists", compare = ">", amount = 630, player = 1, one_shot = true, on = Lava}
+    trigger.resource{resource = "Colonists", compare = ">", amount = 205, player = 1, one_shot = true, on = StormRepeat}
+    trigger.resource{resource = "Colonists", compare = ">", amount = 100, player = 1, one_shot = true, on = TornadoRepeat}
+    trigger.resource{resource = "Colonists", compare = ">", amount = 360, player = 1, one_shot = true, on = MeteorRepeat}
+    trigger.time{min = 8000, max = 12000, one_shot = false, on = Quake}  -- after 80 to 120 marks
+    trigger.resource{resource = "Colonists", compare = ">", amount = 500, player = 1, one_shot = true, on = BigQuake}
+    trigger.research{tech = 3851, player = 1, one_shot = true, on = ResearchedWeapons}  -- ResearchedWeapons isn't converted
+    trigger.research{tech = 5201, player = 1, one_shot = true, on = ResearchedMed}  -- ResearchedMed isn't converted
+    trigger.research{tech = 8201, player = 1, one_shot = true, on = ResearchedBig}  -- ResearchedBig isn't converted
+    trigger.time{time = 7000, on = ScoutArrive}  -- after 70 marks
+    trigger.resource{resource = "Colonists", compare = ">", amount = 470, player = 1, one_shot = true, on = BigWave3}  -- BigWave3 isn't converted
+    trigger.resource{resource = "Colonists", compare = ">", amount = 540, player = 1, one_shot = true, on = BigWave3}  -- BigWave3 isn't converted
+    trigger.resource{resource = "Colonists", compare = ">", amount = 630, player = 1, one_shot = true, on = BigWave3}  -- BigWave3 isn't converted
+    trigger.resource{resource = "Colonists", compare = ">", amount = 690, player = 1, one_shot = true, on = BigWave3}  -- BigWave3 isn't converted
+  end
   trigger.research{tech = 7102, player = 1, one_shot = true, on = ResStarflare}  -- ResStarflare isn't converted
   trigger.research{tech = 5506, player = 1, one_shot = true, on = ResRailGun}  -- ResRailGun isn't converted
   trigger.research{tech = 5508, player = 1, one_shot = true, on = ResEMP}  -- ResEMP isn't converted

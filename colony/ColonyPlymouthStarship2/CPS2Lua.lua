@@ -189,6 +189,10 @@ local function make_unit(player, u, at, kits, exact)
   local made = game.create_unit{ type = u.type, player = player, at = at, direction = u.direction,
                                  weapon = u.weapon, lights = u.lights, exact = exact }
   if u.cargo and made[1] then made[1]:set_cargo(u.cargo, u.amount) end
+  -- A ConVec's kit with its weapon (a Guard Post kit's).
+  if u.topping and made[1] then made[1]:set_kit(u.weapon, u.topping) end
+  -- A vehicle the setup parks in a Garage: its bay, by the Garage's dock.
+  if u.garage and made[1] then made[1]:put_in_garage(u.garage.bay, u.garage.at) end
   if u.type == "StructureFactory" and kits and made[1] then
     for bay, kit in pairs(kits) do made[1]:set_factory_cargo(bay, kit[1], kit[2]) end
     kits_set = true
@@ -225,10 +229,14 @@ function make_player(player, p)
   if p.view then player:center_view(place(p.view)) end
 end
 
-function make_things(d)
-  for _, w in ipairs(d.walls) do
+function make_walls(walls)
+  for _, w in ipairs(walls) do
     if w[1] == "Tube" then game.create_tube(w[2]) else game.create_wall(w[1], w[2]) end
   end
+end
+
+function make_things(d)
+  make_walls(d.walls)
   for _, b in ipairs(d.beacons) do game.create_beacon(b) end
 end
 
@@ -1727,13 +1735,16 @@ function on_init()
 
   -- The computer player's base, where the setup makes it.
   setup_ai(players[2])
-  trigger.time{time = 15000, one_shot = false, on = TimeUpgrades}  -- after 150 marks
+  if difficulty == "Easy" then
+    trigger.time{time = 20000, one_shot = false, on = TimeUpgrades}  -- after 200 marks
+  elseif difficulty == "Normal" then
+    trigger.time{time = 15000, one_shot = false, on = TimeUpgrades}  -- after 150 marks
+  elseif difficulty == "Hard" then
+    trigger.time{time = 13500, one_shot = false, on = TimeUpgrades}  -- after 135 marks
+  end
   trigger.time{time = 1000, one_shot = false, on = TraceOre}  -- after 10 marks  -- TraceOre isn't converted
   trigger.time{time = 350000, on = Microbe}  -- after 3500 marks
 end
 
 -- Not converted:
--- - Easy: units are made other ways than CreateUnit (34 on the map, 14 made)
--- - Normal: units are made other ways than CreateUnit (31 on the map, 11 made)
--- - Hard: units are made other ways than CreateUnit (31 on the map, 11 made)
 -- - TraceOre isn't converted: it calls nothing

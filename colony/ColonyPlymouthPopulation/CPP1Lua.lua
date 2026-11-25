@@ -1,5 +1,5 @@
 -- CPP1Lua.lua  -  Colony Builder - Plymouth, Population (Lua)
--- Trigger functions finished by hand (Rand_Meteor, Bad_Meteor, CheckForFail, TopQuakeLine, SideQuakeLine, Fault1Line, Fault2Line, RandStorm, TornadoAlley, TimeUpgrades, ScoutWave, SpawnAttack, StageDone), from the disassembly of CPP1.dll.
+-- Trigger functions finished by hand (Rand_Meteor, Bad_Meteor, CheckForFail, TopQuakeLine, SideQuakeLine, Fault1Line, Fault2Line, RandStorm, TornadoAlley, TimeUpgrades, ScoutWave, SpawnAttack, StageDone, ReleaseMorale), from the disassembly of CPP1.dll.
 -- Converted by op2dll from CPP1.dll. With CPP1Lua.placement.lua (what every difficulty makes alike),
 -- this makes the colony's start: what changes with the difficulty, and the beacons the setup rolls.
 -- Games run: Easy 151, Normal 151, Hard 151.
@@ -90,6 +90,10 @@ local function make_unit(player, u, at, kits, exact)
   local made = game.create_unit{ type = u.type, player = player, at = at, direction = u.direction,
                                  weapon = u.weapon, lights = u.lights, exact = exact }
   if u.cargo and made[1] then made[1]:set_cargo(u.cargo, u.amount) end
+  -- A ConVec's kit with its weapon (a Guard Post kit's).
+  if u.topping and made[1] then made[1]:set_kit(u.weapon, u.topping) end
+  -- A vehicle the setup parks in a Garage: its bay, by the Garage's dock.
+  if u.garage and made[1] then made[1]:put_in_garage(u.garage.bay, u.garage.at) end
   if u.type == "StructureFactory" and kits and made[1] then
     for bay, kit in pairs(kits) do made[1]:set_factory_cargo(bay, kit[1], kit[2]) end
     kits_set = true
@@ -126,10 +130,14 @@ function make_player(player, p)
   if p.view then player:center_view(place(p.view)) end
 end
 
-function make_things(d)
-  for _, w in ipairs(d.walls) do
+function make_walls(walls)
+  for _, w in ipairs(walls) do
     if w[1] == "Tube" then game.create_tube(w[2]) else game.create_wall(w[1], w[2]) end
   end
+end
+
+function make_things(d)
+  make_walls(d.walls)
   for _, b in ipairs(d.beacons) do game.create_beacon(b) end
 end
 
@@ -681,6 +689,11 @@ function StageDone(t)
   stage_trigger = trigger.time{time = math.max(wait, 1000), on = SpawnAttack}
 end
 
+-- Easy's morale lock lasts 10 ticks: then every player's morale is free (FreeMoraleLevel(-1)).
+function ReleaseMorale(t)
+  game.free_morale()
+end
+
 function on_init()
   local difficulty = DIFFICULTIES[players[1].difficulty] and players[1].difficulty or "Normal"
   local d = DIFFICULTIES[difficulty]
@@ -1140,8 +1153,17 @@ function on_init()
   if difficulty == "Easy" then game.morale_steady("Good") end
 
   -- The win.
-  local t5 = trigger.resource{resource = "Colonists", compare = ">=", amount = 600, player = 1, one_shot = true}
-  mission.victory(t5, "Build your population to 600 colonists.")
+  local t5
+  if difficulty == "Easy" then
+    t5 = trigger.resource{resource = "Colonists", compare = ">=", amount = 450, player = 1, one_shot = true}
+    mission.victory(t5, "Build your population to 450 colonists.")
+  elseif difficulty == "Normal" then
+    t5 = trigger.resource{resource = "Colonists", compare = ">=", amount = 600, player = 1, one_shot = true}
+    mission.victory(t5, "Build your population to 600 colonists.")
+  elseif difficulty == "Hard" then
+    t5 = trigger.resource{resource = "Colonists", compare = ">=", amount = 750, player = 1, one_shot = true}
+    mission.victory(t5, "Build your population to 750 colonists.")
+  end
   local t7 = trigger.operational{type = "CommandCenter", compare = "==", count = 0, player = 1}
   mission.failure(t7)
   trigger.time{time = 40, one_shot = false, on = CheckForFail}  -- after 0 marks
@@ -1183,8 +1205,15 @@ function on_init()
   quake_slots[4] = trigger.time{min = 7500, max = 22500, on = Fault2Line}  -- after 75 to 225 marks
   trigger.time{min = 100, max = 24000, on = TornadoAlley}  -- after 1 to 240 marks
   trigger.time{min = 100, max = 8000, on = RandStorm}  -- after 1 to 80 marks
-  stage_trigger = trigger.time{time = 50000, on = SpawnAttack}  -- after 500 marks
-  trigger.time{time = 22000, one_shot = false, on = TimeUpgrades}  -- after 220 marks
+  if difficulty == "Easy" then
+    trigger.time{time = 10, on = ReleaseMorale}  -- after 0 marks
+  elseif difficulty == "Normal" then
+    stage_trigger = trigger.time{time = 50000, on = SpawnAttack}  -- after 500 marks
+    trigger.time{time = 22000, one_shot = false, on = TimeUpgrades}  -- after 220 marks
+  elseif difficulty == "Hard" then
+    stage_trigger = trigger.time{time = 40000, on = SpawnAttack}  -- after 400 marks
+    trigger.time{time = 18000, one_shot = false, on = TimeUpgrades}  -- after 180 marks
+  end
   scout_trigger = trigger.time{time = 8000, one_shot = false, on = ScoutWave}  -- after 80 marks
 end
 

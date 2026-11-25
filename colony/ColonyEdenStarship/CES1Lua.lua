@@ -1,5 +1,5 @@
 -- CES1Lua.lua  -  Colony Builder - Eden, Starship (Lua)
--- Trigger functions finished by hand (CheckForFail, DoMeteor, DoQuake, DoLightning, DoTornado, Base2CommonCheck, ExpandBase1_B, Base2RareCheck, SpawnAttack, StageDone, Base3CommonCheck, Base3RareCheck, ExitMapMultiple, ExpandBase1_C, GiveAIOre, LavaSpeedup), from the disassembly of CES1.dll.
+-- Trigger functions finished by hand (CheckForFail, DoMeteor, DoQuake, DoLightning, DoTornado, Base2CommonCheck, ExpandBase1_B, Base2RareCheck, SpawnAttack, StageDone, Base3CommonCheck, Base3RareCheck, ExitMapMultiple, ExpandBase1_C, GiveAIOre, LavaSpeedup, ReleaseMorale), from the disassembly of CES1.dll.
 -- Converted by op2dll from CES1.dll. With CES1Lua.placement.lua (what every difficulty makes alike),
 -- this makes the colony's start: what changes with the difficulty, and the beacons the setup rolls.
 -- Games run: Easy 151, Normal 151, Hard 151.
@@ -151,6 +151,10 @@ local function make_unit(player, u, at, kits, exact)
   local made = game.create_unit{ type = u.type, player = player, at = at, direction = u.direction,
                                  weapon = u.weapon, lights = u.lights, exact = exact }
   if u.cargo and made[1] then made[1]:set_cargo(u.cargo, u.amount) end
+  -- A ConVec's kit with its weapon (a Guard Post kit's).
+  if u.topping and made[1] then made[1]:set_kit(u.weapon, u.topping) end
+  -- A vehicle the setup parks in a Garage: its bay, by the Garage's dock.
+  if u.garage and made[1] then made[1]:put_in_garage(u.garage.bay, u.garage.at) end
   if u.type == "StructureFactory" and kits and made[1] then
     for bay, kit in pairs(kits) do made[1]:set_factory_cargo(bay, kit[1], kit[2]) end
     kits_set = true
@@ -187,10 +191,14 @@ function make_player(player, p)
   if p.view then player:center_view(place(p.view)) end
 end
 
-function make_things(d)
-  for _, w in ipairs(d.walls) do
+function make_walls(walls)
+  for _, w in ipairs(walls) do
     if w[1] == "Tube" then game.create_tube(w[2]) else game.create_wall(w[1], w[2]) end
   end
+end
+
+function make_things(d)
+  make_walls(d.walls)
   for _, b in ipairs(d.beacons) do game.create_beacon(b) end
 end
 
@@ -276,11 +284,12 @@ local function ai_block(i)
   ai_blocks[i] = ai_blocks[i] or ai.unit_block(AI_UNITS[i])
   return ai_blocks[i]
 end
-local ai_player, ai_base1, ai_mining1, ai_base2, ai_base3, ai_fight1, ai_fight2, ai_fight3, ai_fight4, ai_fight5, ai_fight6, ai_fight7, ai_fight8
+local ai_player, ai_base1, ai_mining1, ai_base2, ai_base3, ai_fight1, ai_fight2, ai_fight3, ai_fight4, ai_fight5, ai_fight6, ai_fight7, ai_fight8, ai_mining2_hard
 local TimeUpgrades_step = 0
 
 local function setup_ai(p)
   ai_player = p
+  local difficulty = DIFFICULTIES[players[1].difficulty] and players[1].difficulty or "Normal"
   p:go_plymouth()
   p.ore = 10000
   ai_block(1):create_units(p, false)
@@ -299,8 +308,42 @@ local function setup_ai(p)
   ai_mining1:setup({ 158, 173 }, { 166, 158 }, "CommonOreMine", "CommonOreSmelter", { 161, 154, 169, 161 })
   ai_mining1:take_unit(game.create_unit{ type = "CargoTruck", player = p, at = { 163, 160 }, exact = true, lights = false }[1])
   ai_mining1:take_unit(game.create_unit{ type = "CargoTruck", player = p, at = { 163, 160 }, exact = true, lights = false }[1])
-  ai_mining1:set_targ_count("CargoTruck", nil, 5)
+  if difficulty == "Easy" or difficulty == "Normal" then
+    ai_mining1:set_targ_count("CargoTruck", nil, 5)
+  elseif difficulty == "Hard" then
+    ai_mining1:set_targ_count("CargoTruck", nil, 4)
+  end
   ai_base1:record_veh_reinforce_group(ai_mining1, 100)
+  if difficulty == "Hard" then
+    ai_base1:record_building({ 154, 172 }, "CommonOreSmelter")
+    ai_mining2_hard = ai.mining_group(p)
+    ai_mining2_hard:setup({ 158, 173 }, { 155, 173 }, "CommonOreMine", "CommonOreSmelter", { 161, 154, 169, 161 })
+    ai_mining2_hard:set_targ_count("CargoTruck", nil, 2)
+    ai_base1:record_veh_reinforce_group(ai_mining2_hard, 100)
+    ai_base1:record_tube({ 153, 160 })
+    ai_base1:record_tube({ 152, 160 })
+    ai_base1:record_tube({ 152, 161 })
+    ai_base1:record_tube({ 152, 162 })
+    ai_base1:record_tube({ 152, 163 })
+    ai_base1:record_tube({ 152, 164 })
+    ai_base1:record_tube({ 152, 165 })
+    ai_base1:record_tube({ 152, 166 })
+    ai_base1:record_tube({ 152, 167 })
+    ai_base1:record_tube({ 152, 168 })
+    ai_base1:record_tube({ 152, 169 })
+    ai_base1:record_tube({ 152, 170 })
+    ai_base1:record_tube({ 153, 159 })
+    ai_base1:record_tube({ 154, 159 })
+    ai_base1:record_tube({ 155, 159 })
+    ai_base1:record_tube({ 156, 159 })
+    ai_base1:record_tube({ 157, 159 })
+    ai_base1:record_tube({ 158, 159 })
+    ai_base1:record_tube({ 159, 159 })
+    ai_base1:record_tube({ 160, 159 })
+    ai_base1:record_tube({ 161, 159 })
+    ai_base1:record_tube({ 162, 159 })
+    ai_base1:record_tube({ 163, 159 })
+  end
   p:set_tech_level(3)
   ai_base2 = ai.building_group(p)
   ai_base2:set_rect({ 166, 139, 181, 160 })
@@ -2018,6 +2061,11 @@ function LavaSpeedup(t)
   t:destroy()
 end
 
+-- Easy's morale lock lasts 10 ticks: then every player's morale is free (FreeMoraleLevel(-1)).
+function ReleaseMorale(t)
+  game.free_morale()
+end
+
 function on_init()
   local difficulty = DIFFICULTIES[players[1].difficulty] and players[1].difficulty or "Normal"
   local d = DIFFICULTIES[difficulty]
@@ -2660,6 +2708,9 @@ function on_init()
   if players[1].difficulty ~= "Hard" then
     game.create_beacon{ type = "MagmaVent", ore = "Random", yield = "Random", variant = "Random", at = { 6, 252 } }
   end
+  if difficulty == "Easy" then
+    trigger.time{time = 10, on = ReleaseMorale}  -- after 0 marks
+  end
 
   -- The win.
   local t10 = trigger.count{type = "EvacuationModule", compare = ">=", count = 1, one_shot = true}
@@ -2676,7 +2727,9 @@ function on_init()
   trigger.time{min = 10000, max = 20000, one_shot = false, on = DoQuake}  -- after 100 to 200 marks
   trigger.time{min = 20000, max = 25000, one_shot = false, on = DoLightning}  -- after 200 to 250 marks
   trigger.time{min = 25000, max = 30000, one_shot = false, on = DoTornado}  -- after 250 to 300 marks
-  trigger.time{min = 10000, max = 20000, one_shot = false, on = DoMeteor}  -- after 100 to 200 marks
+  if difficulty == "Normal" or difficulty == "Hard" then
+    trigger.time{min = 10000, max = 20000, one_shot = false, on = DoMeteor}  -- after 100 to 200 marks
+  end
   trigger.time{time = 5000, one_shot = false, on = GiveAIOre}  -- after 50 marks
   game.create_beacon{ type = "MiningBeacon", ore = "Common", yield = "Bar3", variant = "Random", at = { 159, 173 } }
   game.create_beacon{ type = "MiningBeacon", ore = "Rare", yield = "Bar2", variant = "Random", at = { 186, 135 } }
@@ -2690,7 +2743,7 @@ function on_init()
 
   -- The computer player's base, where the setup makes it.
   setup_ai(players[2])
-  trigger.time{time = 13000, one_shot = false, on = TimeUpgrades}  -- after 130 marks
+  trigger.time{time = ({ Easy = 20000, Normal = 13000, Hard = 11000 })[difficulty], one_shot = false, on = TimeUpgrades}
   -- The computer's first move, kept at 0x11018488: SpawnAttack's first wave 28000 ticks and up to 3500 more out,
   -- 5/4 of that on Normal; on Easy its leaving instead (0x11003694).
   if players[1].difficulty ~= "Easy" then
@@ -2704,7 +2757,4 @@ function on_init()
 end
 
 -- Not converted:
--- - Easy: units are made other ways than CreateUnit (46 on the map, 15 made)
--- - Normal: units are made other ways than CreateUnit (45 on the map, 14 made)
--- - Hard: units are made other ways than CreateUnit (45 on the map, 14 made)
 -- - TraceOre isn't converted: it calls nothing
