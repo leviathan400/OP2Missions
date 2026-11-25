@@ -2040,8 +2040,32 @@ end
 -- Not written yet: base 3's wait for a Rare Ore Smelter, which Base3CommonCheck starts.
 function Base3RareCheck(t) end
 
--- Not written yet: on Easy, the computer's units leaving the map.
-function ExitMapMultiple(t) end
+-- Easy's move instead of a wave (0x11001D60): a new group of player 2's, in the wave's slot, leaves the map by
+-- 256,5 - 257,25 (0x11018140) and is deleted once empty. It takes, unit by unit, those of fight groups 1, 4, 6, 5, 7
+-- and 2 (the list at 0x11014198) for which a draw of 100 comes to 50 or less, at most 31; the next comes 7/8 of the
+-- time between waves and a draw of up to 1/8 of it later.
+function ExitMapMultiple(t)
+  wave_group = ai.fight_group(players[2])
+  wave_group:do_exit_map()
+  wave_group:set_rect({ 256, 5, 257, 25 })
+  wave_group:set_delete_when_empty(true)
+  local taken = 0
+  for _, g in ipairs({ ai_fight1, ai_fight4, ai_fight6, ai_fight5, ai_fight7, ai_fight2 }) do
+    for _, u in ipairs(g:units()) do
+      if game.rand(100) <= 50 then
+        taken = taken + 1
+        g:remove_unit(u)
+        wave_group:take_unit(u)
+        if taken == 31 then break end
+      end
+    end
+    if taken == 31 then break end
+  end
+  attack_trigger:destroy()
+  local period = WAVE_PERIOD[players[1].difficulty] or 14000
+  local wait = game.rand(period // 8)
+  attack_trigger = trigger.time{time = period * 7 // 8 + wait, on = ExitMapMultiple}
+end
 
 -- Not written yet: base 1's third expansion, which ExpandBase1_B starts.
 function ExpandBase1_C(t) end
