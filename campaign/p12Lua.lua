@@ -1,5 +1,5 @@
 -- p12Lua.lua  -  Plymouth Mission #12 (Lua)
--- Trigger functions finished by hand (CheckForFail, GiveOre, ExpandAuxBase, EarlyHarass, fgAttack, DoHarrassAttack, SpidersPresent, KidsDead), from the disassembly of p12.dll.
+-- Trigger functions finished by hand (CheckForFail, GiveOre, ExpandAuxBase, EarlyHarass, fgAttack, DoHarrassAttack, SpidersPresent, KidsDead, RLVTaken, GarageEmpty, SideAttack, BringInKids, KidsArrived, KidsInSpace, RestartKids), from the disassembly of p12.dll.
 -- Converted by op2dll from p12.dll. With p12Lua.placement.lua (what every difficulty makes alike),
 -- this makes the colony's start: what changes with the difficulty, and the beacons the setup rolls.
 -- Games run: Easy 151, Normal 151, Hard 151.
@@ -658,10 +658,6 @@ function roll_beacons(rolled)
   end
 end
 
--- Not converted (the list at the end says why); their triggers are made as the original makes them.
-function BringInKids(t) end
-function RLVTaken(t) end
-
 
 -- The triggers CheckForFail reads (0x1101314C, 0x11013148): the Rare and Common Metals cargoes.
 local t22, t24
@@ -678,6 +674,30 @@ local harass_trigger, harass_wait
 local rlv_spaceport, spider_trigger, kids_trigger, capture_trigger
 local t17
 
+-- The Eden children's Evacuation Transport (0x11013154), the Command Center it drives to (0x11013158), and
+-- BringInKids's triggers: the Command Center's special target (0x11013138), the transport's count (0x1101313C) and
+-- RestartKids's (0x11013144).
+local kids, kids_cc, kids_target, kids_count, kids_restart
+-- After the RLV's capture: GarageEmpty's trigger (0x1101311C) and its rounds (0x110130F4), SideAttack's trigger
+-- (0x11013124).
+local garage_trigger, side_trigger
+local garage_rounds = 0
+-- GarageEmpty's unit by round (types 0x11010000, weapons 0x11010018), and SideAttack's weapons, by a draw of 5 for
+-- the raid (0x11010030) and of 3 for its escort (0x11010048).
+local GARAGE_UNITS = { { "Tiger", "ThorsHammer" }, { "Panther", "AcidCloud" }, { "Panther", "Laser" },
+                       { "Panther", "RailGun" }, { "Panther", "EMP" }, { "Lynx", "EMP" } }
+local SIDE_WEAPONS = { "ThorsHammer", "AcidCloud", "Laser", "RailGun", "Starflare" }
+local SIDE_ESCORT_WEAPONS = { "ThorsHammer", "AcidCloud", "EMP" }
+local TANKS = { [5] = "Lynx", [6] = "Panther", [7] = "Tiger" }
+local DIFFICULTY_STEP = { Easy = 0, Normal = 1, Hard = 2 }
+-- The transport drives to the tile below the Command Center.
+local function kids_to(cc)
+  if kids and cc then kids:move({ cc.x, cc.y + 1 }) end
+end
+local function kids_target_on(cc)
+  return trigger.special_target{target = cc, type = "EvacuationTransport", on = KidsArrived}
+end
+local function new_objective() game.message_at("New Objective", 122, nil, -1, -1) end
 -- Where fgAttack and DoHarrassAttack send the attackers (0x11013030, 0x110130C8, 0x110130D8), by a draw of 5.
 local HARASS_RECTS = { { 194, 21, 204, 36 }, { 194, 21, 204, 36 }, { 194, 21, 204, 36 }, { 207, 3, 219, 9 }, { 183, 40, 202, 44 } }
 -- The setup's walls and tubes, in its order, at the three points it makes them (0x11003980 on): before the beacons and
@@ -1153,14 +1173,15 @@ function DoHarrassAttack(t)
 end
 
 -- A Spider beside the RLV's Spaceport (0x11002C50): once the Spaceport is EMPed, the special target and KidsDead stop,
--- the RLV win's trigger starts, the Spaceport launches, "RLV Captured" is posted and TryCapture runs every 20 ticks.
+-- the RLV win's trigger starts, the Spaceport launches though EMPed (DoLaunch(0, 0, 1)), "RLV Captured" is posted
+-- and TryCapture runs every 20 ticks.
 function SpidersPresent(t)
   if not rlv_spaceport.is_emped then return end
   spider_trigger:disable()
   kids_trigger:disable()
   t17:enable()
   rlv_spaceport:clear_special_target()
-  rlv_spaceport:launch_at_pixel(0, 0)
+  rlv_spaceport:launch_at_pixel(0, 0, true)
   game.message_at("RLV Captured", 169, nil, -1, -1)
   capture_trigger = trigger.time{time = 20, one_shot = false, on = TryCapture}
 end
@@ -1169,13 +1190,125 @@ end
 function TryCapture(t)
   if players[2].rlv_count > 0 then
     capture_trigger:disable()
-    players[1]:capture_rlv(1)
+    players[1]:capture_rlv(2)
   end
 end
 
--- The computer player's Spaceport is gone (0x11002E40): the children can't be saved; the mission fails.
+-- The computer player's Spaceport gone, or the children's transport (0x11002E40): the mission fails.
 function KidsDead(t)
   mission.failure(trigger.time{time = 1})
+end
+
+-- The RLV captured (0x11004750): GarageEmpty every 90 to 120 ticks, a harassment at once (DoHarrassAttack), the
+-- first SideAttack in 20 to 150 marks, and no more EarlyHarass.
+function RLVTaken(t)
+  garage_trigger = trigger.time{min = 90, max = 120, one_shot = false, on = GarageEmpty}
+  DoHarrassAttack(t)
+  side_trigger = trigger.time{min = 2000, max = 15000, on = SideAttack}
+  if harass_trigger then harass_trigger:destroy() end
+end
+
+-- After the capture, every 90 to 120 ticks (0x110047F0): the round's unit at each of the computer's Garages, for
+-- its attackers; 6 rounds on Easy, 5 on Normal, 4 on Hard.
+function GarageEmpty(t)
+  local u = GARAGE_UNITS[garage_rounds + 1]
+  for _, g in ipairs(ai_player:buildings("Garage")) do
+    local made = game.create_unit{type = u[1], weapon = u[2], player = ai_player, at = { g.x, g.y }, direction = "East",
+                                  lights = false, exact = true}
+    if made[1] then fight_attack:take_unit(made[1]) end
+  end
+  garage_rounds = garage_rounds + 1
+  if garage_rounds == 6 - (DIFFICULTY_STEP[players[1].difficulty] or 1) then garage_trigger:destroy() end
+end
+
+-- 20 to 150 marks after the capture, and again after each (0x110048C0): unless on Easy the computer has no Command
+-- Center or Vehicle Factory (then no more), the raid goes for a Structure Factory or a Spaceport (a draw of 2) from
+-- the north edge at 171,1 or the south at 149,64 (a draw of 2); its Tiger (1 in 3) or Panther with a Laser, then
+-- 4 to 4 + 4 a difficulty step more of the same with drawn weapons, a tile west; its escort 2 to 2 + 3 a step of the
+-- next smaller tank. On Hard both groups' lights are on or off, drawn.
+function SideAttack(t)
+  local step = DIFFICULTY_STEP[players[1].difficulty] or 1
+  if step == 0 and (not ai_player:buildings("CommandCenter")[1] or not ai_player:buildings("VehicleFactory")[1]) then
+    side_trigger:destroy()
+    return
+  end
+  local at = game.rand(2) ~= 0 and { 171, 1 } or { 149, 64 }
+  fight_raid:set_attack_type(game.rand(2) == 0 and "StructureFactory" or "Spaceport")
+  local tank = game.rand(3) == 0 and 7 or 6
+  local function make(weapon, group)
+    local made = game.create_unit{type = TANKS[tank], weapon = weapon, player = ai_player, at = at, direction = "East",
+                                  lights = false, exact = true}
+    if made[1] then group:take_unit(made[1]) end
+  end
+  make("Laser", fight_raid)
+  at = { at[1] - 1, at[2] }
+  for _ = 1, game.rand(step * 4) + 4 do make(SIDE_WEAPONS[game.rand(5) + 1], fight_raid) end
+  tank = tank - 1
+  for _ = 1, game.rand(step * 3) + 2 do make(SIDE_ESCORT_WEAPONS[game.rand(3) + 1], fight_raid_escort) end
+  side_trigger:destroy()
+  side_trigger = trigger.time{min = 2000, max = 15000, on = SideAttack}
+  if step == 2 then
+    local on = game.rand(2) == 0
+    fight_raid:set_lights(on)
+    fight_raid_escort:set_lights(on)
+  end
+end
+
+-- The three cargoes evacuated and the RLV captured (the setup's set trigger): the Eden children's Evacuation
+-- Transport (the third player's) comes in at 210,2, with the new objective posted at it; both other players its
+-- allies, it drives to the colony's first Command Center, a special target for it (KidsArrived); the transport lost
+-- fails the mission (KidsDead); every 40 ticks RestartKids keeps it going (0x11002E90).
+function BringInKids(t)
+  kids = game.create_unit{type = "EvacuationTransport", player = 3, at = { 210, 2 }, direction = "North",
+                          lights = false, exact = true}[1]
+  if kids then kids:set_lights(true) end
+  local c = trigger.count{type = "ChildrenModule", compare = ">=", count = 1, one_shot = true, on = KidsInSpace}
+  mission.victory(c, "Evacuate the Eden children to the starship.", {one_shot = true})
+  -- AddMessage(Unit, ...): at the transport's pixel, the middle of its tile (241,1 in the game's tiles).
+  game.message_at("New Objective", 122, nil, 241 * 32 + 16, 1 * 32 + 16)
+  players[1]:ally_with(3)
+  players[2]:ally_with(3)
+  kids_cc = players[1]:buildings("CommandCenter")[1]
+  kids_to(kids_cc)
+  kids_target = kids_target_on(kids_cc)
+  kids_count = trigger.count{type = "EvacuationTransport", compare = "<", count = 1, player = 3, one_shot = true,
+                             on = KidsDead}
+  kids_restart = trigger.time{time = 40, one_shot = false, on = RestartKids}
+end
+
+-- An Evacuation Transport beside the Command Center (0x11002DA0): the children's ends their triggers and gives
+-- topic 12499 (the Children Module); another one only makes the target anew, on the same Command Center.
+function KidsArrived(t)
+  local u = kids_target:special_target_unit()
+  if u.valid and u.owner == 2 then
+    kids_restart:disable()
+    kids_target:disable()
+    kids_count:disable()
+    players[1]:mark_research(12499)
+  else
+    kids_target = kids_target_on(kids_cc)
+  end
+end
+
+-- The Children Module in orbit (0x11002D20): topic 12599 (the Evacuation Module) and the last objective, 200
+-- colonists.
+function KidsInSpace(t)
+  players[1]:mark_research(12599)
+  local c = trigger.count{type = "EvacuationModule", compare = ">=", count = 1, one_shot = true}
+  mission.victory(c, "Evacuate 200 colonists to the starship.", {one_shot = true})
+  new_objective()
+end
+
+-- Every 40 ticks until the children arrive (0x11003030): their Command Center gone, they drive to the colony's
+-- first one, a new special target; else, standing idle, they drive to theirs again.
+function RestartKids(t)
+  if not (kids_cc and kids_cc.alive) then
+    kids_cc = players[1]:buildings("CommandCenter")[1]
+    kids_to(kids_cc)
+    kids_target = kids_target_on(kids_cc)
+  elseif kids and kids.alive and not kids.busy then
+    kids_to(kids_cc)
+  end
 end
 
 function on_init()
@@ -2175,6 +2308,7 @@ function on_init()
   end
   t17 = trigger.time{time = 1, enabled = false, on = RLVTaken}
   mission.victory(t17, "Capture the Eden RLV.", {one_shot = true})
+  trigger.set{t20, t22, t24, t17, needed = 4, one_shot = true, on = BringInKids}
   spider_trigger = trigger.special_target{target = rlv_spaceport, type = "Spider", one_shot = false, on = SpidersPresent}
   local t32 = trigger.operational{type = "CommandCenter", compare = "==", count = 0, player = 1}
   mission.failure(t32)
@@ -2190,8 +2324,3 @@ function on_init()
   trigger.time{time = 40, one_shot = false, on = CheckForFail}  -- after 0 marks
 end
 
--- Not converted:
--- - condition #27's trigger #17 is made off, and what switches it on isn't converted: this win never comes
--- - BringInKids isn't converted: it calls CreateUnit
--- - RLVTaken isn't converted: it calls FightGroup::DoGuardRect
--- - trigger #26 calls BringInKids, but isn't converted: its member trigger #20 isn't converted

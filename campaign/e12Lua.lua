@@ -1,5 +1,5 @@
 -- e12Lua.lua  -  Eden Mission #12 (Lua)
--- Trigger functions finished by hand (SetPiece, Wave1, Wave2, Reinforce1, ToggleRe, ReinforceArrive, EnemyArrive, FireEMP1, TornadoStop, StormStart, StormStop, CheckForFail), from the disassembly of e12.dll.
+-- Trigger functions finished by hand (SetPiece, StartEMP3, FireEMP3, BringInKids, KidsArrived, KidsDead, KidsInSpace, RestartKids, Wave1, Wave2, Reinforce1, ToggleRe, ReinforceArrive, EnemyArrive, FireEMP1, TornadoStop, StormStart, StormStop, CheckForFail), from the disassembly of e12.dll.
 -- Converted by op2dll from e12.dll. With e12Lua.placement.lua (what every difficulty makes alike),
 -- this makes the colony's start: what changes with the difficulty, and the beacons the setup rolls.
 -- Games run: Easy 151, Normal 151, Hard 151.
@@ -510,15 +510,25 @@ local function setup_ai(p)
   ai_player = p
 end
 
--- Not converted (the list at the end says why); their triggers are made as the original makes them.
-function BringInKids(t) end
-function StartEMP3(t) end
-
 
 -- The evacuation triggers CheckForFail reads (0x1100B334, 0x1100B338): the Rare and Common Metals cargoes.
 local t7, t9
 -- The tornadoes' trigger (0x1100B310) and the storms' (0x1100B314), which TornadoStop and StormStop turn off.
 local tornado_trigger, storm_trigger
+-- FireEMP1's trigger (0x1100B318) and EnemyArrive's (0x1100B320), which StartEMP3 turns off.
+local emp1_trigger, enemy_trigger
+-- The Plymouth children's Evacuation Transport (0x1100B34C), the Command Center it drives to (0x1100B350), and
+-- BringInKids's triggers: the Command Center's special target (0x1100B32C), the transport's count (0x1100B330) and
+-- RestartKids's (0x1100B354).
+local kids, kids_cc, kids_target, kids_count, kids_restart
+local function new_objective() game.message_at("New Objective", 122, nil, -1, -1) end
+-- The transport drives to the tile below the Command Center.
+local function kids_to(cc)
+  if kids and cc then kids:move({ cc.x, cc.y + 1 }) end
+end
+local function kids_target_on(cc)
+  return trigger.special_target{target = cc, type = "EvacuationTransport", on = KidsArrived}
+end
 -- Where the enemy and its EMP missiles aim (0x1100B358): the colony.
 local COLONY = { 72, 19, 106, 34 }
 -- EnemyArrive's two lines (0x1100B1E0, 0x1100B1F0): a column at x 115 from y 2, or a row at y 64 from x 35; and its
@@ -743,6 +753,18 @@ local ARRIVE_LINES = { { 35, 64, true }, { 83, 2, true }, { 128, 51, false }, { 
 -- (0x1100B324) and ToggleRe's (0x1100B328) triggers.
 local set_pieces = 0
 local wave1_trigger, wave2_trigger, reinforce1_trigger, arrive_trigger, toggle_re_trigger
+-- SetPiece's work (0x11003D30), which StartEMP3 and FireEMP3 do too: an EMP missile of the computer's from 0,0 to near
+-- the colony's best target for one (up to 5 tiles up and left; the y's draw first), then the two waves. Normal's first
+-- wave has its least time above its most, as the DLL makes it.
+local function emp_set_piece()
+  local at = game.find_emp_missile_target(COLONY, 1)
+  local dy = game.rand(5)
+  local dx = game.rand(5)
+  game.create_emp_missile({ x = at.x + dx - 5, y = at.y + dy - 5, raw = true }, { x = 0, y = 0, raw = true }, 2)
+  wave1_trigger = trigger.time{min = ({ Easy = 600, Normal = 1200, Hard = 500 })[players[1].difficulty] or 1200,
+                               max = 1000, on = Wave1}
+  wave2_trigger = trigger.time{min = 1800, max = 2400, on = Wave2}
+end
 
 -- Disasters and timed events: what the mission's trigger functions did over 600 calls each, with
 -- the same draws of the game's random numbers. Each is called with the trigger that fired.
@@ -808,16 +830,16 @@ end
 function StartEnemies(t)
   if players[1].difficulty == "Easy" then
     trigger.count{type = "RLV", cargo = "None", compare = ">=", count = 1, player = 1, one_shot = true, on = StartEMP3}
-    trigger.time{min = 8000, max = 10000, one_shot = false, on = FireEMP1}  -- after 80 to 100 marks
+    emp1_trigger = trigger.time{min = 8000, max = 10000, one_shot = false, on = FireEMP1}  -- after 80 to 100 marks
   elseif players[1].difficulty == "Normal" then
     trigger.count{type = "RLV", cargo = "None", compare = ">=", count = 1, player = 1, one_shot = true, on = StartEMP3}
-    trigger.time{min = 6000, max = 9000, one_shot = false, on = FireEMP1}  -- after 60 to 90 marks
-    trigger.time{min = 6000, max = 9000, one_shot = false, on = EnemyArrive}  -- after 60 to 90 marks
+    emp1_trigger = trigger.time{min = 6000, max = 9000, one_shot = false, on = FireEMP1}  -- after 60 to 90 marks
+    enemy_trigger = trigger.time{min = 6000, max = 9000, one_shot = false, on = EnemyArrive}  -- after 60 to 90 marks
   else
     trigger.time{time = 24000, on = SetPiece}  -- after 240 marks
     trigger.count{type = "RLV", cargo = "None", compare = ">=", count = 1, player = 1, one_shot = true, on = SetPiece}
-    trigger.time{min = 6000, max = 7700, one_shot = false, on = FireEMP1}  -- after 60 to 77 marks
-    trigger.time{min = 6000, max = 9000, one_shot = false, on = EnemyArrive}  -- after 60 to 90 marks
+    emp1_trigger = trigger.time{min = 6000, max = 7700, one_shot = false, on = FireEMP1}  -- after 60 to 77 marks
+    enemy_trigger = trigger.time{min = 6000, max = 9000, one_shot = false, on = EnemyArrive}  -- after 60 to 90 marks
   end
 end
 
@@ -833,19 +855,94 @@ function Tornado(t)
   game.create_tornado({ ({ 112, 128, 34, 50 })[r1 + 1], ({ 64, 57, 64, 64 })[r1 + 1] }, { ({ 47, 128, 62, 128 })[r1 + 1], ({ 2, 27, 2, 38 })[r1 + 1] }, ({ 23, 19, 14, 16 })[r1 + 1])
 end
 
--- Hard: at mark 300 or when an RLV is made, whichever comes first (0x11003950, 0x11003D30): an EMP missile of
--- the computer's from 0,0 to near the colony's best target for one (up to 5 tiles up and left; the y's draw first),
--- then the two waves.
+-- Hard: at mark 240 or when an RLV is made, whichever comes first (0x11003950): the EMP missile and the two waves.
 function SetPiece(t)
   set_pieces = set_pieces + 1
   if set_pieces ~= 1 then return end
-  local at = game.find_emp_missile_target(COLONY, 1)
-  local dy = game.rand(5)
-  local dx = game.rand(5)
-  game.create_emp_missile({ x = at.x + dx - 5, y = at.y + dy - 5, raw = true }, { x = 0, y = 0, raw = true }, 2)
-  wave1_trigger = trigger.time{min = ({ Easy = 600, Normal = 1200, Hard = 500 })[players[1].difficulty] or 1200,
-                               max = 1000, on = Wave1}
-  wave2_trigger = trigger.time{min = 1800, max = 2400, on = Wave2}
+  emp_set_piece()
+end
+
+-- Easy and Normal, the first RLV (0x11003B40): FireEMP1's and EnemyArrive's triggers off, and SetPiece's missile
+-- and waves every 78 to 82 marks on Easy, 68 to 72 on Normal (Hard, which never gets here: at once, then every 76 to
+-- 82).
+function StartEMP3(t)
+  if emp1_trigger then emp1_trigger:disable() end
+  if enemy_trigger then enemy_trigger:disable() end
+  local d = players[1].difficulty
+  if d == "Easy" then
+    trigger.time{min = 7800, max = 8200, one_shot = false, on = FireEMP3}
+  elseif d == "Normal" then
+    trigger.time{min = 6800, max = 7200, one_shot = false, on = FireEMP3}
+  elseif d == "Hard" then
+    emp_set_piece()
+    trigger.time{min = 7600, max = 8200, one_shot = false, on = FireEMP3}
+  end
+end
+
+-- StartEMP3's timer (0x11003EF0): the EMP missile and the two waves.
+function FireEMP3(t)
+  emp_set_piece()
+end
+
+-- The three cargoes evacuated (the setup's set trigger): evacuate the Plymouth children; their Evacuation Transport
+-- (the third player's) comes in at 39,63, both other players its allies, and drives to the colony's first Command
+-- Center, a special target for it (KidsArrived); the transport lost fails the mission (KidsDead); every 40 ticks
+-- RestartKids keeps it going (0x110036D0).
+function BringInKids(t)
+  local c = trigger.count{type = "ChildrenModule", compare = ">=", count = 1, one_shot = true, on = KidsInSpace}
+  mission.victory(c, "Evacuate Plymouth children to spacecraft.", {one_shot = true})
+  new_objective()
+  kids = game.create_unit{type = "EvacuationTransport", player = 3, at = { 39, 63 }, direction = "North",
+                          lights = false, exact = true}[1]
+  if kids then kids:set_lights(true) end
+  players[1]:ally_with(3)
+  players[2]:ally_with(3)
+  kids_cc = players[1]:buildings("CommandCenter")[1]
+  kids_to(kids_cc)
+  kids_target = kids_target_on(kids_cc)
+  kids_count = trigger.count{type = "EvacuationTransport", compare = "<", count = 1, player = 3, one_shot = true,
+                             on = KidsDead}
+  kids_restart = trigger.time{time = 40, one_shot = false, on = RestartKids}
+end
+
+-- An Evacuation Transport beside the Command Center (0x110035D0): the children's ends their triggers and gives
+-- topic 12499 (the Children Module); another one only makes the target anew, on the colony's first Command Center.
+function KidsArrived(t)
+  local u = kids_target:special_target_unit()
+  if u.valid and u.owner == 2 then
+    kids_restart:disable()
+    kids_target:disable()
+    kids_count:disable()
+    players[1]:mark_research(12499)
+  else
+    kids_target = kids_target_on(players[1]:buildings("CommandCenter")[1])
+  end
+end
+
+-- The children's transport destroyed (0x11003680): the mission fails.
+function KidsDead(t)
+  mission.failure(trigger.time{time = 1})
+end
+
+-- The Children Module in orbit (0x11003550): topic 12599 (the Evacuation Module) and the last objective, 200
+-- colonists.
+function KidsInSpace(t)
+  players[1]:mark_research(12599)
+  local c = trigger.count{type = "EvacuationModule", compare = ">=", count = 1, one_shot = true}
+  mission.victory(c, "Evacuate 200 colonists to spacecraft.", {one_shot = true})
+  new_objective()
+end
+
+-- Every 40 ticks until the children arrive (0x11003870): their Command Center gone, they drive to the colony's
+-- first one, a new special target; else, standing idle, they drive to theirs again.
+function RestartKids(t)
+  if not (kids_cc and kids_cc.alive) then
+    kids_cc = players[1]:buildings("CommandCenter")[1]
+    kids_to(kids_cc)
+    kids_target = kids_target_on(kids_cc)
+  elseif kids and kids.alive and not kids.busy then
+    kids_to(kids_cc)
+  end
 end
 
 -- SetPiece's first wave (0x11003F00): a group attacking the colony with the difficulty's block, Reinforce1's
@@ -1041,8 +1138,3 @@ function on_init()
   setup_ai(players[2])
 end
 
--- Not converted:
--- - BringInKids isn't converted: a count trigger on a cargo
--- - StartEMP3 isn't converted: it calls ScStub::IsInitialized
--- - trigger #11 calls BringInKids, but isn't converted: its member trigger #5 isn't converted
--- - AIProc isn't converted yet (15000 game calls in the first 300 marks with nobody playing)
