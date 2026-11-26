@@ -1,5 +1,5 @@
 -- p03Lua.lua  -  Plymouth Mission #3 (Lua)
--- Trigger functions finished by hand (CheckForFail, Teleoperations, VehFact, LSOR, MWP), from the disassembly of p03.dll.
+-- Trigger functions finished by hand (CheckForFail, Teleoperations, VehFact, LSOR, MWP, ReleaseMorale), from the disassembly of p03.dll.
 -- Converted by op2dll from p03.dll. With p03Lua.placement.lua (what every difficulty makes alike),
 -- this makes the colony's start: what changes with the difficulty, and the beacons the setup rolls.
 -- Games run: Easy 151, Normal 151, Hard 151.
@@ -439,9 +439,6 @@ function roll_beacons(rolled)
   end
 end
 
--- Not converted (the list at the end says why); their triggers are made as the original makes them.
-function ReleaseMorale(t) end
-
 
 -- The triggers CheckForFail reads (0x1100896C to 0x11008994): the evacuation, ConVec and Robo-Surveyor counts and the
 -- five kits from the setup, then the Scouts, Lynx and Robo-Miner counts the later objectives make (unset until then).
@@ -647,6 +644,11 @@ function MWP(t)
   new_objective()
 end
 
+-- On Easy, 10 ticks in: the morale lock the setup set ends (FreeMoraleLevel(-1), 0x11002610).
+function ReleaseMorale(t)
+  game.free_morale()
+end
+
 function on_init()
   local difficulty = DIFFICULTIES[players[1].difficulty] and players[1].difficulty or "Normal"
   local d = DIFFICULTIES[difficulty]
@@ -666,7 +668,7 @@ function on_init()
   if difficulty == "Easy" then game.morale_steady("Good") end
   for _, r in ipairs(LAVA_POSSIBLE) do game.set_lava_possible(r) end
   if difficulty == "Easy" then
-    trigger.time{time = 10, on = ReleaseMorale}  -- after 0 marks  -- ReleaseMorale isn't converted
+    trigger.time{time = 10, on = ReleaseMorale}  -- after 0 marks
   end
 
   -- The win.
@@ -765,5 +767,3 @@ function on_init()
   trigger.time{time = 40, one_shot = false, on = CheckForFail}  -- after 0 marks
 end
 
--- Not converted:
--- - ReleaseMorale isn't converted: it calls FreeMoraleLevel

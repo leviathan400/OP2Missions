@@ -36,8 +36,10 @@ tested this way. Reports are welcome as issues.
 disasters, scripted events and reinforcements, and the computer player's base, AI groups and waves. All 24 matched their
 originals in OP2TestHarness at all three difficulties (seed 1, nobody playing, up to 40,000 ticks): 72 runs, every
 unit's owner, type, weapon, position and hit points and the game's random numbers on every tick. That tests what a
-mission does on its own; some chains the player sets off (research finished, a structure built, Plymouth 12's RLV taken)
-are still empty functions, listed at the end of each `.lua`. A mission's carry-over from the one before isn't converted.
+mission does on its own. The objectives the player's research and buildings add (Eden 3 and 5, Plymouth 1, 3, 5 and 8)
+were run the same way with the research and units given by script, objectives and messages compared too. Still empty or
+unconverted, listed at the end of each `.lua`: Eden 4's and Plymouth 4's lab visits, Eden 7's RestorePeople, and Eden
+12's and Plymouth 12's evacuation of the children. A mission's carry-over from the one before isn't converted.
 
 **Colony games:** each setup was run at Easy, Normal and Hard over many seeds. What every difficulty makes alike is in
 the placement file; the rest (extra units, colonists, stores, research, kits, morale) and the beacons the setup rolls

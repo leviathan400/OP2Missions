@@ -1,5 +1,5 @@
 -- p08Lua.lua  -  Plymouth Mission #8 (Lua)
--- Trigger functions finished by hand (CheckForFail, DualDone, EnemyArrive1Q, LaterWave), from the disassembly of p08.dll.
+-- Trigger functions finished by hand (CheckForFail, DualDone, FactDone, SpaceDone, EnemyArrive1Q, LaterWave), from the disassembly of p08.dll.
 -- Converted by op2dll from p08.dll. With p08Lua.placement.lua (what every difficulty makes alike),
 -- this makes the colony's start: what changes with the difficulty, and the beacons the setup rolls.
 -- Games run: Easy 151, Normal 151, Hard 151.
@@ -402,16 +402,14 @@ local function setup_ai(p)
   ai_player = p
 end
 
--- Not converted (the list at the end says why); their triggers are made as the original makes them.
-function FactDone(t) end
-function SpaceDone(t) end
 
-
--- The triggers CheckForFail reads (0x1100AB94 to 0x1100ABB4): on Normal the Panther, RPG Panther, Lynx, Stickyfoam
--- Lynx and evacuation counts, then the Ion Drive, Fusion Drive or Fueling Systems, and Skydock in orbit.
-local t19, t20, t23, t24, t27, t11, t15, t17
--- DualDone's Tigers wanted (0x1100AB90), which CheckForFail reads once it's set.
-local tiger_trigger
+-- The triggers CheckForFail reads, by the low byte of their slot (0x1100AB90 to 0x1100ABB4): the vehicle objectives
+-- (90: Tigers, 94: Panthers, 98: RPG Panthers, 9C: Lynx, A0: Stickyfoam or EMP Lynx, A4: evacuation), then the space
+-- ones (A8: Ion Drive, AC: Fusion Drive or Fueling Systems, B0: Fueling Systems, B4: Skydock). The setup fills them by
+-- difficulty (`op2dll disasm --dwords 10 --difficulty N` after it), DualDone and Easy's SpaceDone later. An empty slot
+-- isn't checked.
+local fail_slots = {}
+local function new_objective() game.message_at("New Objective", 122, nil, -1, -1) end
 -- Where the waves go (0x1100ABB8), and the two map edges they come in on (0x1100AA60, a column; 0x1100AA70, a row):
 -- the first unit at the given tile and each next one tile further along.
 local WAVE_RECT = { 97, 21, 113, 38 }
@@ -602,14 +600,16 @@ function CheckForFail(t)
   local need = ({ Easy = { 8000, 4000 }, Normal = { 10000, 7500 }, Hard = { 10000, 8000 } })[p.difficulty]
   if p.ore < need[1] and not p:can_accumulate_ore() then fail = true end
   if p.rare_ore < need[2] and not p:can_accumulate_rare_ore() then fail = true end
-  local missing = tiger_trigger ~= nil and not tiger_trigger:has_fired(1)
-  for _, k in ipairs({ t19, t20, t23, t24, t27 }) do
-    if not k:has_fired(1) then missing = true end
+  local missing = false
+  for _, s in ipairs({ 0x90, 0x94, 0x98, 0x9C, 0xA0, 0xA4 }) do
+    local k = fail_slots[s]
+    if k and not k:has_fired(1) then missing = true end
   end
   if missing and not p:can_build_vehicle(1) then fail = true end
   missing = false
-  for _, k in ipairs({ t11, t15, t17 }) do
-    if not k:has_fired(1) then missing = true end
+  for _, s in ipairs({ 0xA8, 0xAC, 0xB0, 0xB4 }) do
+    local k = fail_slots[s]
+    if k and not k:has_fired(1) then missing = true end
   end
   if missing and not p:can_build_space() then fail = true end
   for _, tech in ipairs({ 3901, 7102 }) do
@@ -621,9 +621,29 @@ end
 -- Dual-Turret Weapons Systems researched: a new objective, three Tigers on Easy and five otherwise (0x11003720).
 function DualDone(t)
   local n = players[1].difficulty == "Easy" and 3 or 5
-  tiger_trigger = trigger.count{type = "Tiger", cargo = -1, compare = ">=", count = n, player = 1}
-  mission.victory(tiger_trigger, "Have " .. n .. " or more Tigers.")
-  game.message_at("New Objective", 122, nil, -1, -1)
+  fail_slots[0x90] = trigger.count{type = "Tiger", cargo = -1, compare = ">=", count = n, player = 1}
+  mission.victory(fail_slots[0x90], "Have " .. n .. " or more Tigers.")
+  new_objective()
+end
+
+-- Easy, an Arachnid Factory built: have 3 Spiders (0x11003870).
+function FactDone(t)
+  local c = trigger.count{type = "Spider", compare = ">=", count = 3, player = 1}
+  mission.victory(c, "Have 3 or more Spiders.")
+  new_objective()
+end
+
+-- Easy, a Spaceport built: put the Ion Drive Module, Fusion Drive Module, Fueling Systems and Skydock in orbit, the
+-- space checks (slots A8, AC, B0, B4; 0x110039D0).
+function SpaceDone(t)
+  for _, o in ipairs({ { 0xA8, "IonDriveModule", "Place the Ion Drive Module in orbit." },
+                       { 0xAC, "FusionDriveModule", "Place the Fusion Drive Module in orbit." },
+                       { 0xB0, "FuelingSystems", "Place the Fueling Systems in orbit." },
+                       { 0xB4, "Skydock", "Place the Skydock in orbit." } }) do
+    fail_slots[o[1]] = trigger.count{type = o[2], compare = ">=", count = 1, player = 1, one_shot = true}
+    mission.victory(fail_slots[o[1]], o[3])
+  end
+  new_objective()
 end
 
 -- The first wave (size 0 or 1), then the later ones every 45 to 55 marks on Easy, 50 to 60 on Normal and 20 to 40 on
@@ -666,7 +686,7 @@ function on_init()
   game.set_daylight_everywhere(false)
 
   -- The win.
-  local t5, t7, t9, t13, t14, t19h
+  local t5, t7, t9, t11, t19, t23, t13, t14, t15, t17, t20, t24, t19h
   if difficulty == "Easy" then
     t5 = trigger.resource{resource = "Food", compare = ">=", amount = 3000, player = 1}
     mission.victory(t5, "Have 3000 units of food in storage.")
@@ -729,7 +749,7 @@ function on_init()
     t24 = trigger.count{type = "Lynx", cargo = "Stickyfoam", compare = ">=", count = 1, player = 1}
     mission.victory(t24, "Have 1 or more Stickyfoam Lynx.")
   end
-  t27 = trigger.evac{player = 1}
+  local t27 = trigger.evac{player = 1}
   mission.victory(t27, "Have enough Evacuation Transports for your population.")
   local t29 = trigger.research{tech = 7102, player = 1, one_shot = true}
   mission.victory(t29, "Completely research Explosive Charges.")
@@ -744,6 +764,12 @@ function on_init()
   elseif difficulty == "Normal" then
     t31 = trigger.research{tech = 8201, player = 1, one_shot = true, on = DualDone}
     mission.victory(t31, "Completely research Dual-Turret Weapons Systems.")
+  end
+  if difficulty == "Easy" then
+    fail_slots = { [0x94] = t19, [0x9C] = t23, [0xA0] = t24, [0xA4] = t27 }
+  else
+    fail_slots = { [0x90] = t19h, [0x94] = t19, [0x98] = t20, [0x9C] = t23, [0xA0] = t24, [0xA4] = t27,
+                   [0xA8] = t11, [0xAC] = t15, [0xB4] = t17 }
   end
   local t34 = trigger.resource{resource = "Scientists", compare = ">=", amount = 23, player = 1}
   mission.victory(t34, "Keep at least 23 scientists alive.")
@@ -771,6 +797,3 @@ function on_init()
   setup_ai(players[2])
 end
 
--- Not converted:
--- - FactDone isn't converted: a count trigger on a cargo
--- - SpaceDone isn't converted: a count trigger on a cargo

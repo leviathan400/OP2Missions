@@ -1,5 +1,5 @@
 -- e05Lua.lua  -  Eden Mission #5 (Lua)
--- Trigger functions finished by hand (CheckForFail, ScoutLeave, PatrolArrive, PatrolLeave), from the disassembly of e05.dll.
+-- Trigger functions finished by hand (CheckForFail, ScoutLeave, PatrolArrive, PatrolLeave, NextRes, PantherObj, ROP, SpaceDone, HasSpacePort), from the disassembly of e05.dll.
 -- Converted by op2dll from e05.dll. With e05Lua.placement.lua (what every difficulty makes alike),
 -- this makes the colony's start: what changes with the difficulty, and the beacons the setup rolls.
 -- Games run: Easy 151, Normal 151, Hard 151.
@@ -485,10 +485,6 @@ local function setup_ai(p)
   ai_player = p
 end
 
--- Not converted (the list at the end says why); their triggers are made as the original makes them.
-function NextRes(t) end
-function ROP(t) end
-
 
 -- The triggers CheckForFail reads (0x1100A7F0 to 0x1100A824): on Normal the eight vehicle counts, the five kits, the
 -- EDWARD Satellite.
@@ -526,6 +522,9 @@ local PATROL_UNITS = {
       { type = "Panther", at = { 2, 108 }, direction = "North", weapon = "Microwave" } },
   },
 }
+-- How many of Easy's two research objectives NextRes has seen (0x1100A7E8).
+local nextres_calls = 0
+local function new_objective() game.message_at("New Objective", 122, nil, -1, -1) end
 local patrol_blocks = {}
 local function patrol_block(kind, r)
   local key = kind .. r
@@ -784,6 +783,48 @@ function PatrolLeave(t)
   patrol_group:set_rect(PATROL_RECT)
 end
 
+-- Easy, Advanced Combat Chassis or Independant Turret Power Systems researched: after both, research Directional
+-- Magnetic Fields (then PantherObj; 0x11002B60).
+function NextRes(t)
+  nextres_calls = nextres_calls + 1
+  if nextres_calls < 2 then return end
+  local r = trigger.research{tech = 5506, player = 1, one_shot = true, on = PantherObj}
+  mission.victory(r, "Completely research Directional Magnetic Fields.")
+  new_objective()
+end
+
+-- Easy, Directional Magnetic Fields researched: have 2 Rail Gun Panthers, a vehicle check (t23, slot 0x1100A80C;
+-- 0x11002AE0).
+function PantherObj(t)
+  t23 = trigger.count{type = "Panther", cargo = "RailGun", compare = ">=", count = 2, player = 1}
+  mission.victory(t23, "Have 2 or more Rail Gun Panthers.")
+  new_objective()
+end
+
+-- Easy, Rare Ore Processing researched: research the Space Program (then SpaceDone) and have 2000 Rare Metals in
+-- Cargo Trucks (0x11002CD0).
+function ROP(t)
+  local r = trigger.research{tech = 5405, player = 1, one_shot = true, on = SpaceDone}
+  mission.victory(r, "Completely research the Space Program.")
+  local c = trigger.count{type = "CargoTruck", cargo = 5, compare = ">=", count = 2, player = 1}
+  mission.victory(c, "Have 2000 units of Rare Metals in Cargo Trucks.")
+  new_objective()
+end
+
+-- Easy, the Space Program researched: build a Spaceport (then HasSpacePort; 0x11002C60).
+function SpaceDone(t)
+  local s = trigger.operational{type = "Spaceport", compare = ">=", count = 1, player = 1, one_shot = true, on = HasSpacePort}
+  mission.victory(s, "Build a Spaceport.")
+  new_objective()
+end
+
+-- Easy, a Spaceport built: launch a satellite, the space check (t21, slot 0x1100A810; 0x11002BE0).
+function HasSpacePort(t)
+  t21 = trigger.count{type = "EDWARDSatellite", compare = ">=", count = 1, player = 1, one_shot = true}
+  mission.victory(t21, "Launch a satellite.")
+  new_objective()
+end
+
 function on_init()
   local difficulty = DIFFICULTIES[players[1].difficulty] and players[1].difficulty or "Normal"
   local d = DIFFICULTIES[difficulty]
@@ -891,14 +932,14 @@ function on_init()
   end
   t37 = trigger.evac{player = 1}
   mission.victory(t37, "Have enough Evacuation Transports for your population.")
-  local t31e, t33e
+  local t31e, t33e, t35e
   if difficulty == "Easy" then
     t31e = trigger.research{tech = 5110, player = 1, one_shot = true, on = ROP}
     mission.victory(t31e, "Completely research Rare Ore Processing.")
     t33e = trigger.research{tech = 5201, player = 1, one_shot = true, on = NextRes}
     mission.victory(t33e, "Completely research Advanced Combat Chassis.")
-    t35 = trigger.research{tech = 5111, player = 1, one_shot = true, on = NextRes}
-    mission.victory(t35, "Completely research Independant Turret Power Systems.")
+    t35e = trigger.research{tech = 5111, player = 1, one_shot = true, on = NextRes}
+    mission.victory(t35e, "Completely research Independant Turret Power Systems.")
   end
   local t39 = trigger.research{tech = 5115, player = 1, one_shot = true}
   mission.victory(t39, "Completely research Geothermal Power.")
@@ -943,6 +984,3 @@ function on_init()
   setup_ai(players[2])
 end
 
--- Not converted:
--- - NextRes isn't converted: it calls CreateResearchTrigger
--- - ROP isn't converted: it calls CreateResearchTrigger

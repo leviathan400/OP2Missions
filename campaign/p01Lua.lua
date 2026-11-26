@@ -1,4 +1,5 @@
 -- p01Lua.lua  -  Plymouth Mission #1 (Lua)
+-- Trigger functions finished by hand (CheckKits, EnableFails), from the disassembly of p01.dll.
 -- Converted by op2dll from p01.dll. With p01Lua.placement.lua (what every difficulty makes alike),
 -- this makes the colony's start: what changes with the difficulty, and the beacons the setup rolls.
 -- Games run: Easy 151, Normal 151, Hard 151.
@@ -411,9 +412,9 @@ function roll_beacons(rolled)
   end
 end
 
--- Not converted (the list at the end says why); their triggers are made as the original makes them.
-function CheckKits(t) end
-function EnableFails(t) end
+
+-- The six kit triggers CheckKits reads (0x11008D38 to 0x11008D4C).
+local kit_triggers = {}
 
 -- Disasters and timed events: what the mission's trigger functions did over 600 calls each, with
 -- the same draws of the game's random numbers. Each is called with the trigger that fired.
@@ -525,6 +526,22 @@ function EvacTokamakKit(t)
   EvacTokamakKit_done = true
 end
 
+-- Every 20 ticks: a kit gone (no ConVec carries one of the six) fails the mission (0x110013C0).
+function CheckKits(t)
+  for _, k in ipairs(kit_triggers) do
+    if not k:has_fired(1) then
+      mission.failure(trigger.time{time = 1})
+      return
+    end
+  end
+end
+
+-- No building left: fewer than 4 Cargo Trucks of Food, or of Common Metals, fails the mission (0x11001490).
+function EnableFails(t)
+  mission.failure(trigger.count{type = "CargoTruck", cargo = 1, compare = "<", count = 4, player = 1, one_shot = true})
+  mission.failure(trigger.count{type = "CargoTruck", cargo = 4, compare = "<", count = 4, player = 1, one_shot = true})
+end
+
 function on_init()
   local difficulty = DIFFICULTIES[players[1].difficulty] and players[1].difficulty or "Normal"
   local d = DIFFICULTIES[difficulty]
@@ -600,6 +617,10 @@ function on_init()
   end
   local t30 = trigger.vehicle_count{compare = "<", count = 22, player = 1, one_shot = true}
   mission.failure(t30)
+  -- The kits that must stay: one ConVec with each (0x11008D38 to 0x11008D4C), for CheckKits.
+  for _, kind in ipairs({ "CommandCenter", "CommonOreSmelter", "Agridome", "Tokamak", "BasicLab", "StructureFactory" }) do
+    kit_triggers[#kit_triggers + 1] = trigger.kit{type = kind, count = 1, player = 1}
+  end
   if difficulty == "Easy" then
     trigger.time{time = 2700, on = EruptLava}  -- after 27 marks
   elseif difficulty == "Normal" then
@@ -607,11 +628,7 @@ function on_init()
   elseif difficulty == "Hard" then
     trigger.time{time = 900, on = EruptLava}  -- after 9 marks
   end
-  trigger.time{time = 20, one_shot = false, on = CheckKits}  -- after 0 marks  -- CheckKits isn't converted
-  trigger.building_count{compare = "==", count = 0, player = 1, one_shot = true, on = EnableFails}  -- EnableFails isn't converted
+  trigger.time{time = 20, one_shot = false, on = CheckKits}  -- after 0 marks
+  trigger.building_count{compare = "==", count = 0, player = 1, one_shot = true, on = EnableFails}
 end
 
--- Not converted:
--- - CheckKits isn't converted: it calls Trigger::HasFired
--- - EnableFails isn't converted: a count trigger on a cargo
--- - 8 of the setup's triggers aren't converted yet (they call NoResponseToTrigger, CheckKits, EnableFails)

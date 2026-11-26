@@ -1,5 +1,5 @@
 -- e03Lua.lua  -  Eden Mission #3 (Lua)
--- Trigger functions finished by hand (CheckForFail, StartMicrobe1), from the disassembly of e03.dll.
+-- Trigger functions finished by hand (CheckForFail, FreeMorale, Teleop, VehFact, LSOR, MWP, StartMicrobe1), from the disassembly of e03.dll.
 -- Converted by op2dll from e03.dll. With e03Lua.placement.lua (what every difficulty makes alike),
 -- this makes the colony's start: what changes with the difficulty, and the beacons the setup rolls.
 -- Games run: Easy 151, Normal 151, Hard 151.
@@ -288,16 +288,17 @@ function roll_beacons(rolled)
   end
 end
 
--- Not converted (the list at the end says why); their triggers are made as the original makes them.
-function FreeMorale(t) end
-function Teleop(t) end
-
 
 -- The triggers CheckForFail reads (0x110071A0 to 0x110071C8): on Normal the Robo-Surveyor, evacuation and ConVec
 -- counts, then the five kits.
 local t19, t21, t23, t5, t6, t7, t8, t9
 -- StartMicrobe1's flags (0x11007198, 0x1100719C).
 local microbe_started, microbe_calls = false, 0
+-- The vehicle checks' six slots (0x110071A0 to 0x110071B4, by the low byte): the setup fills some by difficulty
+-- (`op2dll disasm --dwords` after it), Teleop, VehFact and MWP put their counts in A0, B0 and B4. An empty slot isn't
+-- checked.
+local fail_slots = {}
+local function new_objective() game.message_at("New Objective", 122, nil, -1, -1) end
 
 -- Disasters and timed events: what the mission's trigger functions did over 600 calls each, with
 -- the same draws of the game's random numbers. Each is called with the trigger that fired.
@@ -385,7 +386,7 @@ function CheckForFail(t)
   end
   if ore < (players[1].difficulty == "Easy" and 5000 or 6000) and not p:can_accumulate_ore() then fail = true end
   local missing = false
-  for _, k in pairs({ t21, t23, t19 }) do
+  for _, k in pairs({ fail_slots[0xA8], fail_slots[0xAC], fail_slots[0xA0], fail_slots[0xA4], fail_slots[0xB4], fail_slots[0xB0] }) do
     if not k:has_fired(1) then missing = true end
   end
   if missing and not p:can_build_vehicle(1) then fail = true end
@@ -397,6 +398,56 @@ function CheckForFail(t)
   if not p:has_tech(3602) and not p:can_do_research(3602) then fail = true end
   if not p:has_tech(3851) and not p:can_do_research(3851) then fail = true end
   if fail then mission.failure(trigger.time{time = 1}) end
+end
+
+-- On Easy, 10 ticks in: the morale lock the setup set ends (FreeMoraleLevel(-1), 0x11001480).
+function FreeMorale(t)
+  game.free_morale()
+end
+
+-- Cybernetic Teleoperations researched (0x11001690): on Easy, build a Vehicle Factory (then VehFact); on Normal, have
+-- 2 Scouts, a Robo-Miner and 4 Lynx (the vehicle checks' slots A0, B4, B0); on Hard nothing.
+function Teleop(t)
+  local d = players[1].difficulty
+  if d == "Easy" then
+    local f = trigger.operational{type = "VehicleFactory", compare = ">=", count = 1, player = 1, one_shot = true, on = VehFact}
+    mission.victory(f, "Build a Vehicle Factory.", { one_shot = true })
+    new_objective()
+  elseif d == "Normal" then
+    fail_slots[0xA0] = trigger.count{type = "Scout", compare = ">=", count = 2, player = 1, one_shot = false}
+    mission.victory(fail_slots[0xA0], "Have 2 or more Scouts.")
+    fail_slots[0xB4] = trigger.count{type = "RoboMiner", compare = ">=", count = 1, player = 1, one_shot = false}
+    mission.victory(fail_slots[0xB4], "Have 1 or more Robo-Miners.")
+    fail_slots[0xB0] = trigger.count{type = "Lynx", compare = ">=", count = 4, player = 1, one_shot = false}
+    mission.victory(fail_slots[0xB0], "Have 4 or more Lynx.")
+    new_objective()
+  end
+end
+
+-- Easy, a Vehicle Factory built (0x11001580): have 2 Scouts and a Robo-Miner (slots A0, B4), research Large-Scale
+-- Optical Resonators (then LSOR).
+function VehFact(t)
+  fail_slots[0xA0] = trigger.count{type = "Scout", compare = ">=", count = 2, player = 1, one_shot = false}
+  mission.victory(fail_slots[0xA0], "Have 2 or more Scouts.")
+  fail_slots[0xB4] = trigger.count{type = "RoboMiner", compare = ">=", count = 1, player = 1, one_shot = false}
+  mission.victory(fail_slots[0xB4], "Have 1 or more Robo-Miners.")
+  local r = trigger.research{tech = 3602, player = 1, one_shot = true, on = LSOR}
+  mission.victory(r, "Completely research Large-Scale Optical Resonators.", { one_shot = true })
+  new_objective()
+end
+
+-- Easy, Large-Scale Optical Resonators researched (0x11001510): research Mobile Weapons Platforms (then MWP).
+function LSOR(t)
+  local r = trigger.research{tech = 3851, player = 1, one_shot = true, on = MWP}
+  mission.victory(r, "Completely research Mobile Weapons Platforms.", { one_shot = true })
+  new_objective()
+end
+
+-- Easy, Mobile Weapons Platforms researched (0x11001490): have 4 Lynx (slot B0).
+function MWP(t)
+  fail_slots[0xB0] = trigger.count{type = "Lynx", compare = ">=", count = 4, player = 1, one_shot = false}
+  mission.victory(fail_slots[0xB0], "Have 4 or more Lynx.")
+  new_objective()
 end
 
 -- The Blight on six tiles at 17,63 - 19,64, with a message, spreading by difficulty; on Easy only at its second call
@@ -423,7 +474,7 @@ function on_init()
   game.set_daylight_everywhere(false)
   if difficulty == "Easy" then game.morale_steady("Good") end
   if difficulty == "Easy" then
-    trigger.time{time = 10, on = FreeMorale}  -- after 0 marks  -- FreeMorale isn't converted
+    trigger.time{time = 10, on = FreeMorale}  -- after 0 marks
   end
 
   -- The win.
@@ -486,6 +537,11 @@ function on_init()
   mission.victory(t27, "Completely research Health Maintenance.")
   local t29 = trigger.research{tech = 3301, player = 1, one_shot = true}
   mission.victory(t29, "Completely research Emergency Response Systems.")
+  if difficulty == "Hard" then
+    fail_slots = { [0xA0] = t21h, [0xA4] = t19, [0xA8] = t21, [0xB0] = t23, [0xB4] = t25 }
+  else
+    fail_slots = { [0xA4] = t19, [0xA8] = t21, [0xAC] = t23 }
+  end
   local t33 = trigger.resource{resource = "Scientists", compare = ">=", amount = 15, player = 1}
   mission.victory(t33, "Have at least 15 scientists alive.")
   local t31, t32
@@ -526,6 +582,3 @@ function on_init()
   trigger.time{time = 40, one_shot = false, on = CheckForFail}  -- after 0 marks
 end
 
--- Not converted:
--- - FreeMorale isn't converted: it calls FreeMoraleLevel
--- - Teleop isn't converted: it calls CreateOperationalTrigger

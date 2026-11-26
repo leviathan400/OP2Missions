@@ -1,5 +1,5 @@
 -- p05Lua.lua  -  Plymouth Mission #5 (Lua)
--- Trigger functions finished by hand (CheckForFail, Microbe, ScoutLeave, MoreUnits), from the disassembly of p05.dll.
+-- Trigger functions finished by hand (CheckForFail, Microbe, ScoutLeave, MoreUnits, ReleaseMorale, AdvDone, ITPSDone, RPDone, RareDone), from the disassembly of p05.dll.
 -- Converted by op2dll from p05.dll. With p05Lua.placement.lua (what every difficulty makes alike),
 -- this makes the colony's start: what changes with the difficulty, and the beacons the setup rolls.
 -- Games run: Easy 151, Normal 151, Hard 151.
@@ -488,18 +488,25 @@ local function setup_ai(p)
   ai_player = p
 end
 
--- Not converted (the list at the end says why); their triggers are made as the original makes them.
-function AdvDone(t) end
-function ITPSDone(t) end
-function RareDone(t) end
-function ReleaseMorale(t) end
-
 
 -- The triggers CheckForFail reads (0x1100AED8 to 0x1100AF0C): on Normal the evacuation, ConVec, Earthworker,
 -- Robo-Miner, Robo-Surveyor, Panther, RPG Panther, Lynx and EMP Lynx counts, then the five kits.
 local t33, t40, t32, t30, t31, t24, t25, t21, t22, t5, t6, t7, t8, t9
 -- The scouts' group (0x1100AEC8), Microbe's calls (0x1100AED0) and the Hard waves so far (0x1100AED4).
 local scout_group, microbe_calls, waves = nil, 0, 0
+-- How many of Easy's Advanced Combat Chassis and Independant Turret Power Systems objectives are done (0x1100AECC).
+local research_done = 0
+local function new_objective() game.message_at("New Objective", 122, nil, -1, -1) end
+-- Easy, both of those researched: research Rocket Propulsion (then RPDone) and Electromagnetic Pulsing.
+local function next_research()
+  research_done = research_done + 1
+  if research_done ~= 2 then return end
+  local r = trigger.research{tech = 5602, player = 1, one_shot = true, on = RPDone}
+  mission.victory(r, "Completely research Rocket Propulsion.")
+  local e = trigger.research{tech = 5508, player = 1, one_shot = true}
+  mission.victory(e, "Completely research Electromagnetic Pulsing.")
+  new_objective()
+end
 -- Where the waves come in (0x1100ADA8).
 local WAVE_RECT = { 119, 60, 129, 63 }
 -- The waves' units as the DLL ships them (`op2dll disasm --block --shipped`): Easy's (0x1100AC00); Normal's before
@@ -766,6 +773,46 @@ function MoreUnits(t)
   end
 end
 
+-- On Easy, 10 ticks in: the morale lock the setup set ends (FreeMoraleLevel(-1), 0x11002D70).
+function ReleaseMorale(t)
+  game.free_morale()
+end
+
+-- Easy, Advanced Combat Chassis researched: four Panthers bring the Blight (Microbe) and are an objective, a vehicle
+-- check (t24, slot 0x1100AEF4; 0x11002D80).
+function AdvDone(t)
+  trigger.count{type = "Panther", compare = ">=", count = 4, player = 1, one_shot = true, on = Microbe}
+  t24 = trigger.count{type = "Panther", compare = ">=", count = 4, player = 1}
+  mission.victory(t24, "Have 4 or more total Panthers.")
+  new_objective()
+  next_research()
+end
+
+-- Easy, Independant Turret Power Systems researched: next_research's step, then (Easy only, as the DLL checks)
+-- research Legged Robots (0x11002F50).
+function ITPSDone(t)
+  next_research()
+  if players[1].difficulty == "Easy" then
+    local r = trigger.research{tech = 5116, player = 1, one_shot = true}
+    mission.victory(r, "Completely research Legged Robots.")
+    new_objective()
+  end
+end
+
+-- Easy, Rocket Propulsion researched: have 2 RPG Panthers, a vehicle check (t25, slot 0x1100AEF8; 0x11002ED0).
+function RPDone(t)
+  t25 = trigger.count{type = "Panther", cargo = "RPG", compare = ">=", count = 2, player = 1}
+  mission.victory(t25, "Have 2 or more RPG Panthers.")
+  new_objective()
+end
+
+-- Easy, Rare Ore Processing researched: have 2000 Rare Metals in Cargo Trucks (0x11003090).
+function RareDone(t)
+  local c = trigger.count{type = "CargoTruck", cargo = 5, compare = ">=", count = 2, player = 1}
+  mission.victory(c, "Have 2000 units of Rare Metals in Cargo Trucks.")
+  new_objective()
+end
+
 function on_init()
   local difficulty = DIFFICULTIES[players[1].difficulty] and players[1].difficulty or "Normal"
   local d = DIFFICULTIES[difficulty]
@@ -783,7 +830,7 @@ function on_init()
   if difficulty == "Easy" then game.morale_steady("Good") end
   for _, r in ipairs(LAVA_POSSIBLE) do game.set_lava_possible(r) end
   if difficulty == "Easy" then
-    trigger.time{time = 10, on = ReleaseMorale}  -- after 0 marks  -- ReleaseMorale isn't converted
+    trigger.time{time = 10, on = ReleaseMorale}  -- after 0 marks
   end
 
   -- The win.
@@ -928,8 +975,3 @@ function on_init()
   setup_ai(players[2])
 end
 
--- Not converted:
--- - AdvDone isn't converted: a count trigger on a cargo
--- - ITPSDone isn't converted: it calls CreateResearchTrigger
--- - RareDone isn't converted: a count trigger on a cargo
--- - ReleaseMorale isn't converted: it calls FreeMoraleLevel
